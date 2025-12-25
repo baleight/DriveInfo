@@ -20,9 +20,8 @@ export const getResources = async (): Promise<ResourceItem[]> => {
     
     const data = await response.json();
     
-    // If sheet is empty (just headers), it might return empty array. 
-    // Merge with initial resources if you want them to always exist, 
-    // or just return data. returning data + initial for demo:
+    // Logic: If the database (Sheet) has data, show ONLY that data (Single Source of Truth).
+    // If the database is completely empty, show the Mock/Initial data so the site isn't blank.
     if (Array.isArray(data) && data.length > 0) {
         return data;
     } else {
@@ -42,7 +41,7 @@ export const addResource = async (resource: Omit<ResourceItem, 'id'>): Promise<R
     id: Math.random().toString(36).substr(2, 9),
   };
 
-  // Optimistic update for fallback
+  // Optimistic update for fallback/UI speed
   inMemoryDb = [newResourceLocal, ...inMemoryDb];
 
   if (!GOOGLE_APPS_SCRIPT_URL) {
@@ -50,10 +49,14 @@ export const addResource = async (resource: Omit<ResourceItem, 'id'>): Promise<R
   }
 
   try {
-    // Send to Google Sheet
-    // Note: We use text/plain to avoid CORS preflight options request issues with GAS sometimes
+    // CRITICAL FIX: Use 'text/plain;charset=utf-8' for the Content-Type.
+    // This prevents the browser from sending a CORS preflight (OPTIONS) request,
+    // which Google Apps Script web apps usually reject or fail to handle correctly.
     const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
       method: 'POST',
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
       body: JSON.stringify(newResourceLocal),
     });
 
@@ -67,7 +70,7 @@ export const addResource = async (resource: Omit<ResourceItem, 'id'>): Promise<R
 
   } catch (error) {
     console.error("Failed to save to Google Sheet:", error);
-    // Return local version so UI still updates even if backend fails (optimistic)
+    // Even if backend fails, return the local version so the user doesn't lose their input in the UI
     return newResourceLocal;
   }
 };
