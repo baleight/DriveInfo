@@ -94,11 +94,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // 20MB limit (20 * 1024 * 1024 bytes)
-      const MAX_SIZE = 20 * 1024 * 1024; 
+      // 100MB limit (100 * 1024 * 1024 bytes)
+      const MAX_SIZE = 100 * 1024 * 1024; 
 
       if (file.size > MAX_SIZE) {
-          alert("Il file è troppo grande! Il limite massimo è 20MB.");
+          alert("Il file è troppo grande! Il limite massimo è 100MB.");
           if (pdfInputRef.current) pdfInputRef.current.value = '';
           return;
       }
@@ -254,7 +254,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                                 </div>
                                 <div className="text-center">
                                     <p className="text-sm font-bold text-slate-700">Clicca per selezionare PDF</p>
-                                    <p className="text-xs text-slate-400 mt-1">Max 20MB</p>
+                                    <p className="text-xs text-slate-400 mt-1">Max 100MB</p>
                                 </div>
                             </>
                         )}

@@ -4,7 +4,7 @@ import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
 import { ResourceItem } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
-import { Plus, Search, Loader2, Github, X } from 'lucide-react';
+import { Plus, Search, Loader2, X } from 'lucide-react';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
@@ -191,16 +191,6 @@ const App: React.FC = () => {
 
       {/* Floating Actions */}
       <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-40">
-         <a 
-            href="https://github.com" 
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-12 h-12 bg-white text-slate-700 rounded-full shadow-lg hover:shadow-xl border border-slate-100 flex items-center justify-center transition-all hover:scale-110 hidden md:flex"
-            title="Visualizza codice sorgente"
-         >
-            <Github size={20} />
-         </a>
-
         <button 
           onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
           className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-600/30 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
