@@ -5,19 +5,38 @@
 @layer base {
   body {
     font-family: 'Inter', sans-serif;
-    @apply bg-white text-[#37352f];
+    @apply bg-[#F5F7FA] text-slate-800 antialiased;
+    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }
 
-/* Custom Scrollbar for Notion feel */
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, transform, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d3d1cb;
-  border-radius: 5px;
+  background: #94a3b8;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
 }

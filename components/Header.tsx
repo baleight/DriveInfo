@@ -1,49 +1,46 @@
 import React from 'react';
+import { Database, Share2, ShieldCheck } from 'lucide-react';
 
 export const Header: React.FC = () => {
   return (
-    <header className="group relative mb-8">
-      {/* Cover Image */}
-      <div className="h-[30vh] w-full overflow-hidden">
-        <img 
-          src="https://picsum.photos/1200/400?grayscale" 
-          alt="Cover" 
-          className="w-full h-full object-cover object-center"
-        />
-      </div>
-
-      {/* Content Container (Standard Notion Width) */}
-      <div className="max-w-[900px] mx-auto px-12 sm:px-24 relative">
-        {/* Icon (Overlapping Cover) */}
-        <div className="-mt-10 mb-4 select-none">
-          <span className="text-[78px] leading-none">🚸</span>
-        </div>
-
-        {/* Title */}
-        <h1 className="text-4xl font-bold text-[#37352f] mb-4">
-          DRIVE INFORMATICA TRIENNALE
-        </h1>
-
-        {/* Intro Text / Callouts */}
-        <div className="space-y-2 text-[#37352f] text-base leading-6">
-          <p>Qui sotto trovi i link dei materiali creati dagli studenti.</p>
-          <p>
-            <strong>Tutti avete i permessi per modificarli</strong>: l’obiettivo è{' '}
-            <strong>espandere e aggiornare appunti e link</strong>.
-          </p>
-          <p>
-            Usiamoli con buon senso: <strong>niente spam, niente cancellazioni inutili</strong>{' '}
-            e, se possibile, <strong>miglioriamo ciò che già c’è</strong>.
-          </p>
-          
-          <div className="mt-4 p-4 rounded bg-red-50 border border-red-100 text-red-900">
-            Gli studenti degli altri corsi ci invidiano perché noi abbiamo l’open source nel sangue:{' '}
-            <strong>non scordatelo mai.</strong>
+    <header className="pt-12 pb-8 px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-blue-600 text-white p-2 rounded-lg shadow-lg shadow-blue-500/20">
+              <Database size={24} />
+            </div>
+            <span className="text-sm font-bold tracking-wider text-blue-600 uppercase">Drive Informatica</span>
           </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+            Hub Risorse Condivise
+          </h1>
+          <p className="mt-2 text-slate-600 max-w-xl text-lg">
+            La piattaforma open-source per gli studenti di informatica. 
+            Appunti, libri e guide curati dalla community.
+          </p>
         </div>
         
-        <hr className="mt-8 border-[#e9e9e7]" />
+        {/* Quick Stats / Info pill */}
+        <div className="hidden md:flex items-center gap-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 px-3 border-r border-slate-100">
+            <Share2 size={18} className="text-emerald-500" />
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Accesso</span>
+              <span className="text-sm font-semibold text-slate-700">Pubblico</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-2">
+             <ShieldCheck size={18} className="text-blue-500" />
+             <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+              <span className="text-sm font-semibold text-slate-700">Online</span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <div className="w-full h-px bg-gradient-to-r from-slate-200 via-slate-300 to-slate-200" />
     </header>
   );
 };

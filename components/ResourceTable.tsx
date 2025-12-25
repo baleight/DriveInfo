@@ -1,119 +1,94 @@
 import React from 'react';
 import { ResourceItem } from '../types';
 import { Badge } from './Badge';
-import { FileText, Link, Hash, Calendar, BookOpen, Download } from 'lucide-react';
+import { FileText, BookOpen, ExternalLink, Calendar, User } from 'lucide-react';
 
-interface ResourceTableProps {
+interface ResourceGridProps {
   title: string;
   items: ResourceItem[];
   type: 'note' | 'book';
 }
 
-export const ResourceTable: React.FC<ResourceTableProps> = ({ title, items, type }) => {
+export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type }) => {
   if (items.length === 0) return null;
 
   return (
-    <div className="mb-12">
-      <h3 className="text-xl font-semibold mb-3 text-[#37352f] px-1 border-l-2 border-transparent hover:border-black transition-colors">
-        {title}
-      </h3>
-      
-      <div className="overflow-x-auto border-t border-b border-[#e9e9e7] sm:border-0">
-        <table className="w-full text-left text-sm border-collapse table-fixed min-w-[600px]">
-          <thead>
-            <tr className="border-b border-[#e9e9e7]">
-              {type === 'note' ? (
-                <>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-5/12 border-r border-[#e9e9e7]">
-                    <div className="flex items-center gap-2"><FileText size={14} /> Descr.</div>
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-4/12 border-r border-[#e9e9e7]">
-                    <div className="flex items-center gap-2"><Link size={14} /> Files & media</div>
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-1/12 border-r border-[#e9e9e7]">
-                    <div className="flex items-center gap-2"><Hash size={14} /> Anno</div>
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-2/12">
-                    <div className="flex items-center gap-2"><BookOpen size={14} /> Corso</div>
-                  </th>
-                </>
-              ) : (
-                <>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-4/12 border-r border-[#e9e9e7]">
-                    <div className="flex items-center gap-2"><BookOpen size={14} /> Book</div>
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-3/12 border-r border-[#e9e9e7]">
-                     Author
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-2/12 border-r border-[#e9e9e7]">
-                    <div className="flex items-center gap-2"><Calendar size={14} /> Data</div>
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-2/12 border-r border-[#e9e9e7]">
-                     Corso
-                  </th>
-                  <th className="font-normal text-gray-400 py-2 px-3 w-1/12">
-                     <div className="flex items-center gap-2"><Download size={14} /> Link</div>
-                  </th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="group hover:bg-gray-50 border-b border-[#e9e9e7] last:border-b-0">
-                {/* --- NOTE ROW LAYOUT --- */}
-                {type === 'note' && (
-                  <>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top">
-                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-[#37352f] border-b border-gray-300 hover:text-blue-600 flex items-center gap-2">
-                         {item.icon && <img src={item.icon} alt="" className="w-4 h-4" />}
-                         {item.title}
-                      </a>
-                    </td>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
-                       <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{item.url}</a>
-                    </td>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top text-gray-500">
-                      {item.year}
-                    </td>
-                    <td className="py-2 px-3 align-top">
-                      <Badge label={item.category} color={item.categoryColor} />
-                    </td>
-                  </>
-                )}
-
-                {/* --- BOOK ROW LAYOUT --- */}
-                {type === 'book' && (
-                  <>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top">
-                      <div className="flex items-center gap-2">
-                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="font-medium text-[#37352f] border-b border-gray-300 hover:text-blue-600 flex items-center gap-2">
-                          <img src="https://www.notion.so/icons/book_gray.svg" alt="book" className="w-4 h-4 opacity-50" />
-                          {item.title}
-                        </a>
-                      </div>
-                    </td>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top text-gray-600">
-                      {item.description}
-                    </td>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top text-gray-400 text-xs">
-                      {item.dateAdded}
-                    </td>
-                    <td className="py-2 px-3 border-r border-[#e9e9e7] align-top">
-                      <Badge label={item.category} color={item.categoryColor} />
-                    </td>
-                    <td className="py-2 px-3 align-top">
-                       <a href={item.url} className="text-blue-500 hover:bg-blue-50 p-1 rounded inline-block">
-                         Download
-                       </a>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <section className="mb-12 animate-fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          {type === 'note' ? <FileText className="text-blue-500" /> : <BookOpen className="text-violet-500" />}
+          {title}
+        </h3>
+        <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-full">
+          {items.length}
+        </span>
       </div>
-    </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((item) => (
+          <ResourceCard key={item.id} item={item} type={type} />
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const ResourceCard: React.FC<{ item: ResourceItem; type: 'note' | 'book' }> = ({ item, type }) => {
+  return (
+    <a 
+      href={item.url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="group bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 hover:-translate-y-1 relative overflow-hidden flex flex-col h-full"
+    >
+      {/* Top Row: Icon & Badge */}
+      <div className="flex justify-between items-start mb-3">
+        <div className={`p-2 rounded-lg ${type === 'note' ? 'bg-blue-50' : 'bg-violet-50'}`}>
+          {item.icon && !item.icon.includes('svg') ? (
+             <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
+          ) : (
+             type === 'note' ? <FileText size={20} className="text-blue-600" /> : <BookOpen size={20} className="text-violet-600" />
+          )}
+        </div>
+        <Badge label={item.category} color={item.categoryColor} />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-grow">
+        <h4 className="font-bold text-slate-800 group-hover:text-blue-600 leading-snug mb-1">
+          {item.title}
+        </h4>
+        
+        {type === 'book' && item.description && (
+          <p className="text-sm text-slate-500 line-clamp-2 mb-2 flex items-center gap-1">
+            <User size={12} /> {item.description}
+          </p>
+        )}
+        
+        {type === 'note' && (
+           <p className="text-xs text-slate-400 truncate mb-2">{item.url}</p>
+        )}
+      </div>
+
+      {/* Footer Info */}
+      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="flex items-center gap-3">
+          {item.year && (
+            <span className="flex items-center gap-1">
+              <Calendar size={12} /> {item.year}
+            </span>
+          )}
+          {item.dateAdded && type === 'book' && (
+             <span className="flex items-center gap-1">
+             <Calendar size={12} /> {item.dateAdded}
+           </span>
+          )}
+        </div>
+        
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 flex items-center gap-1">
+          Apri <ExternalLink size={12} />
+        </div>
+      </div>
+    </a>
   );
 };
