@@ -1,9 +1,9 @@
 // INSTRUCTIONS:
 // 1. Open your Google Sheet
 // 2. Go to Extensions > Apps Script
-// 3. Paste this code into Code.gs
+// 3. Paste this code into Code.gs (REPLACE ALL EXISTING CODE)
 // 4. Run the 'setupSheet' function once to create headers
-// 5. Deploy as Web App:
+// 5. Deploy as Web App (New Version):
 //    - Execute as: Me
 //    - Who has access: Anyone
 
@@ -34,7 +34,7 @@ function doPost(e) {
 
 function handleRequest(e) {
   const lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  lock.tryLock(30000); // Increased lock time for file operations
   
   try {
     const doc = SpreadsheetApp.getActiveSpreadsheet();
@@ -48,6 +48,21 @@ function handleRequest(e) {
       const id = data.id || Math.random().toString(36).substr(2, 9);
       const timestamp = new Date().toLocaleDateString('en-GB');
       
+      // IMAGE HANDLING
+      // If coverImage is a base64 string, upload it to Drive and get the URL
+      let finalCoverImageUrl = '';
+      if (data.coverImage && data.coverImage.startsWith('data:image')) {
+        try {
+          finalCoverImageUrl = uploadImageToDrive(data.coverImage, id);
+        } catch (imgError) {
+          // If upload fails, just leave it blank to not break the whole row insert
+          finalCoverImageUrl = ''; 
+        }
+      } else {
+        // Assume it's already a URL or empty
+        finalCoverImageUrl = data.coverImage || '';
+      }
+      
       // Map object to array based on headers
       const row = [
         id,
@@ -60,13 +75,17 @@ function handleRequest(e) {
         data.categoryColor || 'gray',
         data.type || 'note',
         data.icon || '',
-        data.coverImage || ''
+        finalCoverImageUrl // Use the Drive URL
       ];
       
       sheet.appendRow(row);
       
+      // Return the new object with the correct URL
       return ContentService
-        .createTextOutput(JSON.stringify({ status: 'success', data: { ...data, id } }))
+        .createTextOutput(JSON.stringify({ 
+            status: 'success', 
+            data: { ...data, id, coverImage: finalCoverImageUrl } 
+        }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -93,4 +112,28 @@ function handleRequest(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Helper to convert Base64 to Drive File
+function uploadImageToDrive(base64String, id) {
+  // 1. Extract content type and data
+  // base64String looks like: "data:image/jpeg;base64,....."
+  const parts = base64String.split(',');
+  const mimeType = parts[0].match(/:(.*?);/)[1];
+  const data = parts[1];
+  
+  // 2. Decode
+  const blob = Utilities.newBlob(Utilities.base64Decode(data), mimeType, "cover_" + id);
+  
+  // 3. Create file in Root or specific folder
+  // Note: To use a specific folder: DriveApp.getFolderById('YOUR_ID').createFile(blob)
+  const file = DriveApp.createFile(blob);
+  
+  // 4. Make it public so the website can see it
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  
+  // 5. Return a direct link (Thumbnail link is usually best for img tags)
+  // We use getThumbnailLink() and replace the size parameter to get a decent size
+  // Alternatively, use `https://drive.google.com/uc?export=view&id=${file.getId()}`
+  return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
 }

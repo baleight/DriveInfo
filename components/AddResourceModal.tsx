@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ResourceCategory, TagColor, ResourceItem } from '../types';
-import { X, Loader2, FileText, BookOpen, Plus } from 'lucide-react';
+import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 interface AddResourceModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface AddResourceModalProps {
 
 export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onClose, onSubmit }) => {
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     type: 'note' as 'note' | 'book',
     title: '',
@@ -17,9 +18,33 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     description: '',
     year: '',
     category: ResourceCategory.GENERAL,
+    coverImage: '', // This will hold the Base64 string temporarily
   });
 
   if (!isOpen) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation: Max 1MB
+    if (file.size > 1024 * 1024) {
+        alert("L'immagine è troppo grande! Il limite è 1MB.");
+        return;
+    }
+
+    // Convert to Base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        setFormData({ ...formData, coverImage: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+      setFormData({ ...formData, coverImage: '' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +79,15 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
         description: '',
         year: '',
         category: ResourceCategory.GENERAL,
+        coverImage: '',
     });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden ring-1 ring-slate-900/5">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden ring-1 ring-slate-900/5 max-h-[90vh] overflow-y-auto">
         
-        <div className="flex justify-between items-center p-6 border-b border-slate-100">
+        <div className="flex justify-between items-center p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
           <h2 className="text-xl font-bold text-slate-800">Condividi una risorsa</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-full transition-colors">
             <X size={20} />
@@ -112,6 +138,47 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 onChange={(e) => setFormData({...formData, url: e.target.value})}
               />
             </div>
+
+            {/* File Upload Area - Only for Books */}
+            {formData.type === 'book' && (
+              <div className="group animate-fade-in">
+                <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-1.5 flex items-center gap-1">
+                  <ImageIcon size={12} /> Copertina (Max 1MB)
+                </label>
+                
+                {!formData.coverImage ? (
+                    <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-blue-400 hover:bg-slate-50 transition-all group/upload"
+                    >
+                        <div className="p-3 bg-slate-100 rounded-full group-hover/upload:bg-blue-100 text-slate-400 group-hover/upload:text-blue-500 transition-colors">
+                            <UploadCloud size={24} />
+                        </div>
+                        <p className="text-sm font-medium text-slate-500">Clicca per caricare immagine</p>
+                        <input 
+                            ref={fileInputRef}
+                            type="file" 
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                    </div>
+                ) : (
+                    <div className="relative w-full h-32 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                        <img src={formData.coverImage} alt="Preview" className="w-full h-full object-cover opacity-80" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <button 
+                                type="button"
+                                onClick={removeImage}
+                                className="bg-white text-red-500 px-4 py-2 rounded-full font-bold shadow-sm hover:scale-105 transition-transform flex items-center gap-2 text-sm"
+                            >
+                                <Trash2 size={16} /> Rimuovi
+                            </button>
+                        </div>
+                    </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
