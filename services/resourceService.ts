@@ -6,6 +6,7 @@ let inMemoryDb: ResourceItem[] = [...INITIAL_RESOURCES];
 
 export const getResources = async (): Promise<ResourceItem[]> => {
   if (!GOOGLE_APPS_SCRIPT_URL) {
+    console.warn("GOOGLE_APPS_SCRIPT_URL is not set in constants.ts. Using mock data.");
     return new Promise((resolve) => setTimeout(() => resolve([...inMemoryDb]), 300));
   }
 
@@ -15,12 +16,14 @@ export const getResources = async (): Promise<ResourceItem[]> => {
     const data = await response.json();
     
     if (Array.isArray(data) && data.length > 0) {
+        console.log(`Successfully fetched ${data.length} resources.`);
         return data;
     } else {
+        console.log("Fetched data is empty or not an array. Using initial resources.");
         return [...INITIAL_RESOURCES]; // Show default if sheet is empty
     }
   } catch (error) {
-    console.error("Failed to fetch:", error);
+    console.error("Failed to fetch resources:", error);
     return [...inMemoryDb];
   }
 };

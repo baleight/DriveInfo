@@ -17,9 +17,14 @@ const App: React.FC = () => {
   // Load initial data
   useEffect(() => {
     const loadData = async () => {
-      const data = await getResources();
-      setResources(data);
-      setIsLoading(false);
+      try {
+          const data = await getResources();
+          setResources(data);
+      } catch (e) {
+          console.error("Error loading resources", e);
+      } finally {
+          setIsLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -55,7 +60,7 @@ const App: React.FC = () => {
 
   // Get unique categories from data
   const availableCategories = useMemo(() => {
-      const cats = new Set(resources.map(r => r.category));
+      const cats = new Set(resources.map(r => r.category).filter(c => c && c.trim() !== ''));
       return Array.from(cats).sort();
   }, [resources]);
 
@@ -73,7 +78,7 @@ const App: React.FC = () => {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(r => 
         r.title.toLowerCase().includes(lowerTerm) || 
-        r.category.toLowerCase().includes(lowerTerm) ||
+        (r.category && r.category.toLowerCase().includes(lowerTerm)) ||
         (r.description && r.description.toLowerCase().includes(lowerTerm))
       );
     }
@@ -81,8 +86,10 @@ const App: React.FC = () => {
     return result;
   }, [resources, searchTerm, selectedCategory]);
 
-  const notes = filteredResources.filter(r => r.type === 'note');
+  // Robust splitting: If it's explicitly a book, it goes to books. Everything else goes to notes.
+  // This ensures items with missing or malformed 'type' fields still appear in the main list.
   const books = filteredResources.filter(r => r.type === 'book');
+  const notes = filteredResources.filter(r => r.type !== 'book');
 
   return (
     <div className="min-h-screen selection:bg-blue-100 selection:text-blue-900 flex flex-col">
