@@ -71,8 +71,8 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
       <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
 
       {/* Icon */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-         {item.icon && !item.icon.includes('svg') ? (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden">
+         {item.icon ? (
             <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
           ) : (
             <FileText size={16} />
@@ -176,7 +176,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
            {/* Top Row: Icon & Badge */}
           <div className="flex justify-between items-start mb-3">
             <div className={`p-2 rounded-lg ${type === 'note' ? 'bg-blue-50' : 'bg-violet-50'}`}>
-              {item.icon && !item.icon.includes('svg') ? (
+              {item.icon ? (
                 <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
               ) : (
                 type === 'note' ? <FileText size={20} className="text-blue-600" /> : <BookOpen size={20} className="text-violet-600" />

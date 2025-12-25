@@ -61,6 +61,10 @@ function handleRequest(e) {
         // Handle Cover Image (Base64 -> Drive)
         const finalCoverImageUrl = processFile(data.coverImage, id + "_cover");
         
+        // Handle Icon Image (Base64 -> Drive)
+        // If data.icon contains a base64 string, upload it. Otherwise assume it's a URL or empty.
+        const finalIconUrl = processFile(data.icon, id + "_icon");
+
         // Handle Main File (Base64 -> Drive) - If provided, it overrides the URL field
         let resourceUrl = data.url;
         if (data.fileData) {
@@ -77,12 +81,12 @@ function handleRequest(e) {
           data.category || 'Generale',
           data.categoryColor || 'gray',
           data.type || 'note',
-          data.icon || '',
+          finalIconUrl || '',
           finalCoverImageUrl
         ];
         sheet.appendRow(row);
         
-        return responseJSON({ status: 'success', data: { ...data, id, coverImage: finalCoverImageUrl, url: resourceUrl } });
+        return responseJSON({ status: 'success', data: { ...data, id, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } });
     }
 
     // --- DELETE ---
@@ -109,12 +113,21 @@ function handleRequest(e) {
             const range = sheet.getRange(rowIndex, 1, 1, 11);
             const currentValues = range.getValues()[0];
 
-            // Check if image is new base64 or existing url
+            // Check if cover image is new base64 or existing url
             let finalCoverImageUrl = currentValues[10]; // Default to existing
             if (data.coverImage && data.coverImage.startsWith('data:image')) {
                  finalCoverImageUrl = processFile(data.coverImage, idToEdit + "_cover");
             } else if (data.coverImage === '') {
                  finalCoverImageUrl = ''; // User removed image
+            }
+
+            // Check if icon is new base64 or existing url
+            let finalIconUrl = currentValues[9]; // Default to existing
+            if (data.icon && data.icon.startsWith('data:image')) {
+                finalIconUrl = processFile(data.icon, idToEdit + "_icon");
+            } else if (data.icon !== undefined) {
+                // If it's a simple URL string or empty, update it
+                finalIconUrl = data.icon;
             }
 
             // Check if a new file was uploaded
@@ -123,7 +136,6 @@ function handleRequest(e) {
                  resourceUrl = processFile(data.fileData, idToEdit + "_file");
             }
             // If user didn't upload new file but provided URL, use URL. 
-            // If user provided nothing (unlikely in UI), keep old? No, form sends state.
 
             // Update cells. order matches headers:
             // id(0), title(1), url(2), description(3), year(4), dateAdded(5), category(6), color(7), type(8), icon(9), cover(10)
@@ -138,12 +150,12 @@ function handleRequest(e) {
                 data.category,
                 data.categoryColor,
                 data.type,
-                data.icon,
+                finalIconUrl,
                 finalCoverImageUrl
             ];
             
             range.setValues([updatedRow]);
-            return responseJSON({ status: 'success', data: { ...data, coverImage: finalCoverImageUrl, url: resourceUrl } });
+            return responseJSON({ status: 'success', data: { ...data, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } });
         } else {
              return responseJSON({ status: 'error', message: 'ID not found' });
         }

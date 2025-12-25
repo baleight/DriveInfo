@@ -4,7 +4,7 @@ import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
 import { ResourceItem } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
-import { Plus, Search, Loader2, X } from 'lucide-react';
+import { Plus, Search, Loader2, X, Github, Mail } from 'lucide-react';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
@@ -85,10 +85,10 @@ const App: React.FC = () => {
   const books = filteredResources.filter(r => r.type === 'book');
 
   return (
-    <div className="min-h-screen pb-32 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen pb-32 selection:bg-blue-100 selection:text-blue-900 flex flex-col">
       <Header />
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 flex-grow w-full">
         
         {/* Search & Filter Section */}
         <div className="max-w-4xl mx-auto mb-12">
@@ -188,6 +188,28 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="mt-20 py-8 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-6 text-sm text-slate-500">
+            <div className="flex items-center gap-2">
+                <Mail size={16} className="text-slate-400" />
+                <span>
+                    Per info: <a href="mailto:giancatastrofe@gmail.com" className="text-blue-600 font-medium hover:underline transition-colors">giancatastrofe@gmail.com</a>
+                </span>
+            </div>
+            <div className="hidden md:block w-1 h-1 bg-slate-300 rounded-full"></div>
+            <a 
+                href="https://github.com/giancatastrofe" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 hover:text-slate-800 transition-colors group"
+            >
+                <Github size={16} className="group-hover:text-black transition-colors" />
+                <span>Scarica il sorgente su GitHub</span>
+            </a>
+        </div>
+      </footer>
 
       {/* Floating Actions */}
       <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-40">
