@@ -3,7 +3,7 @@ import { Database, Share2, ShieldCheck } from 'lucide-react';
 
 export const Header: React.FC = () => {
   return (
-    <header className="pt-12 pb-8 px-6 lg:px-8 max-w-7xl mx-auto">
+    <header className="pt-12 pb-8 px-6 lg:px-12 w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
           <div className="flex items-center gap-3 mb-2">

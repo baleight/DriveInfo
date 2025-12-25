@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ResourceCategory, TagColor, ResourceItem } from '../types';
-import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, RefreshCw } from 'lucide-react';
+import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
 
 interface AddResourceModalProps {
   isOpen: boolean;
@@ -21,14 +21,21 @@ const COLOR_OPTIONS: { value: TagColor; class: string }[] = [
   { value: TagColor.PINK, class: 'bg-pink-50 text-pink-600 border-pink-100' },
 ];
 
-const DEFAULT_NOTE_ICON = 'https://www.notion.so/icons/document_red.svg';
-const DEFAULT_BOOK_ICON = 'https://www.notion.so/icons/book_gray.svg';
+// 6 Predefined Icons
+const PRESET_ICONS = [
+  { id: 'doc', url: 'https://www.notion.so/icons/document_blue.svg', label: 'Documento' },
+  { id: 'book', url: 'https://www.notion.so/icons/book_purple.svg', label: 'Libro' },
+  { id: 'code', url: 'https://www.notion.so/icons/code_red.svg', label: 'Codice' },
+  { id: 'video', url: 'https://www.notion.so/icons/play_pink.svg', label: 'Video' },
+  { id: 'web', url: 'https://www.notion.so/icons/globe_green.svg', label: 'Web' },
+  { id: 'folder', url: 'https://www.notion.so/icons/folder_orange.svg', label: 'Archivio' },
+];
 
 export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
-  const iconInputRef = useRef<HTMLInputElement>(null);
   
   const defaultState = {
     type: 'note' as 'note' | 'book',
@@ -40,7 +47,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     categoryColor: TagColor.GRAY,
     coverImage: '',
     fileData: '',
-    icon: DEFAULT_NOTE_ICON
+    icon: PRESET_ICONS[0].url
   };
 
   const [formData, setFormData] = useState(defaultState);
@@ -49,6 +56,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   // Sync state when modal opens or initialData changes
   useEffect(() => {
     if (isOpen) {
+        setError(null);
         if (initialData) {
             setFormData({
                 type: initialData.type,
@@ -60,7 +68,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 categoryColor: initialData.categoryColor || TagColor.GRAY,
                 coverImage: initialData.coverImage || '',
                 fileData: '',
-                icon: initialData.icon || (initialData.type === 'note' ? DEFAULT_NOTE_ICON : DEFAULT_BOOK_ICON)
+                icon: initialData.icon || PRESET_ICONS[0].url
             });
             setSourceType('url'); 
         } else {
@@ -70,26 +78,17 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     }
   }, [isOpen, initialData]);
 
-  // When changing type, update icon to default IF user hasn't set a custom one (simple heuristic: matches other default)
-  useEffect(() => {
-    if (initialData) return; // Don't auto-change on edit mode
-    
-    if (formData.type === 'note' && formData.icon === DEFAULT_BOOK_ICON) {
-        setFormData(prev => ({ ...prev, icon: DEFAULT_NOTE_ICON }));
-    } else if (formData.type === 'book' && formData.icon === DEFAULT_NOTE_ICON) {
-        setFormData(prev => ({ ...prev, icon: DEFAULT_BOOK_ICON }));
-    }
-  }, [formData.type]);
-
   if (!isOpen) return null;
 
-  // Handle Cover Image
+  // Handle Cover Image (For Books)
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
     const file = e.target.files?.[0];
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) { 
-        alert("L'immagine di copertina è troppo grande! Il limite è 5MB.");
+        setError("L'immagine di copertina è troppo grande! Il limite è 5MB.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
         return;
     }
     const reader = new FileReader();
@@ -104,40 +103,16 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
       if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Handle Custom Icon Upload
-  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      if (file.size > 2 * 1024 * 1024) {
-          alert("L'icona è troppo grande! Il limite è 2MB.");
-          return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-          setFormData({ ...formData, icon: reader.result as string });
-      };
-      reader.readAsDataURL(file);
-  };
-
-  const resetIcon = () => {
-      setFormData({ 
-          ...formData, 
-          icon: formData.type === 'note' ? DEFAULT_NOTE_ICON : DEFAULT_BOOK_ICON 
-      });
-      if (iconInputRef.current) iconInputRef.current.value = '';
-  };
-
   // Handle PDF Upload
   const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setError(null);
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const MAX_SIZE = 100 * 1024 * 1024; 
+      const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
       if (file.size > MAX_SIZE) {
-          alert("Il file è troppo grande! Il limite massimo è 100MB.");
+          setError("Il file selezionato supera il limite di 100MB. Prova a comprimerlo o usa un link esterno.");
           if (pdfInputRef.current) pdfInputRef.current.value = '';
           return;
       }
@@ -151,13 +126,14 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (sourceType === 'url' && !formData.url) {
-        alert("Inserisci un URL valido.");
+        setError("Inserisci un URL valido.");
         return;
     }
     if (sourceType === 'file' && !formData.fileData && !isEditMode) {
-        alert("Seleziona un file PDF da caricare.");
+        setError("Seleziona un file PDF da caricare.");
         return;
     }
 
@@ -166,16 +142,20 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     const resourceData: any = { 
         ...formData,
         dateAdded: initialData?.dateAdded || new Date().toLocaleDateString('en-GB'),
-        // Note: Icon is already in formData
     };
 
     if (sourceType === 'url') {
         resourceData.fileData = '';
     }
 
-    await onSubmit(resourceData);
-    setLoading(false);
-    onClose();
+    try {
+        await onSubmit(resourceData);
+        setLoading(false);
+        onClose();
+    } catch (err) {
+        setLoading(false);
+        setError("Errore durante il salvataggio. Riprova.");
+    }
   };
 
   const isEditMode = !!initialData;
@@ -196,59 +176,45 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           
-          <div className="flex gap-4">
-              {/* Icon Picker */}
-              <div className="flex-shrink-0">
-                   <div 
-                      className="group relative w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 flex items-center justify-center cursor-pointer bg-slate-50 transition-colors overflow-hidden"
-                      onClick={() => iconInputRef.current?.click()}
-                      title="Cambia icona"
-                   >
-                        {formData.icon ? (
-                            <img src={formData.icon} alt="icon" className="w-8 h-8 object-contain" />
-                        ) : (
-                            <div className="text-slate-300">
-                                <ImageIcon size={20} />
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <PenTool size={16} className="text-white" />
-                        </div>
-                   </div>
-                   <input 
-                       ref={iconInputRef}
-                       type="file" 
-                       accept="image/*" 
-                       className="hidden" 
-                       onChange={handleIconChange} 
-                   />
-                   {formData.icon && (formData.icon !== DEFAULT_NOTE_ICON && formData.icon !== DEFAULT_BOOK_ICON) && (
-                       <button 
-                         type="button" 
-                         onClick={resetIcon}
-                         className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-1 mt-1 mx-auto"
-                       >
-                           <RefreshCw size={10} /> Reset
-                       </button>
-                   )}
+          <div className="flex flex-col sm:flex-row gap-4">
+              {/* Type Selector */}
+              <div className="flex-1 grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl h-24 sm:h-auto">
+                <button
+                    type="button"
+                    onClick={() => setFormData({...formData, type: 'note'})}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${formData.type === 'note' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <FileText size={18} /> Appunto
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setFormData({...formData, type: 'book'})}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${formData.type === 'book' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    <BookOpen size={18} /> Libro
+                </button>
               </div>
 
-              {/* Type Selector (Expanded) */}
-              <div className="flex-grow grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl h-16">
-                <button
-                type="button"
-                onClick={() => setFormData({...formData, type: 'note'})}
-                className={`flex flex-col items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${formData.type === 'note' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                <FileText size={18} /> Appunto
-                </button>
-                <button
-                type="button"
-                onClick={() => setFormData({...formData, type: 'book'})}
-                className={`flex flex-col items-center justify-center gap-1 rounded-lg text-xs font-bold transition-all ${formData.type === 'book' ? 'bg-white text-violet-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                <BookOpen size={18} /> Libro / PDF
-                </button>
+              {/* Icon Selector Grid */}
+              <div className="flex-1">
+                 <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-2">Scegli Icona</label>
+                 <div className="grid grid-cols-3 gap-3">
+                    {PRESET_ICONS.map((iconItem) => (
+                        <button
+                            key={iconItem.id}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, icon: iconItem.url })}
+                            className={`aspect-square rounded-xl flex items-center justify-center transition-all duration-300 ${
+                                formData.icon === iconItem.url 
+                                ? 'bg-white border-2 border-blue-600 shadow-md shadow-blue-200 scale-105 opacity-100 ring-2 ring-blue-50' 
+                                : 'bg-slate-50 border border-slate-200 hover:bg-white hover:border-blue-300 hover:shadow-sm opacity-60 hover:opacity-100 grayscale hover:grayscale-0'
+                            }`}
+                            title={iconItem.label}
+                        >
+                            <img src={iconItem.url} alt={iconItem.label} className="w-6 h-6 object-contain" />
+                        </button>
+                    ))}
+                 </div>
               </div>
           </div>
 
@@ -272,14 +238,14 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                     <div className="flex bg-slate-100 rounded-lg p-0.5">
                         <button
                             type="button"
-                            onClick={() => { setSourceType('url'); setFormData({...formData, fileData: ''}); }}
+                            onClick={() => { setSourceType('url'); setFormData({...formData, fileData: ''}); setError(null); }}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${sourceType === 'url' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Link Esterno
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setSourceType('file'); setFormData({...formData, url: ''}); }}
+                            onClick={() => { setSourceType('file'); setFormData({...formData, url: ''}); setError(null); }}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${sourceType === 'file' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Carica File
@@ -302,41 +268,54 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                         />
                     </div>
                 ) : (
-                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-blue-400 hover:bg-slate-50 transition-all bg-slate-50">
-                        {formData.fileData ? (
-                            <div className="flex items-center gap-2 text-green-600 font-bold">
-                                <FileText size={20} />
-                                <span>File pronto per l'invio!</span>
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setFormData({...formData, fileData: ''});
-                                        if (pdfInputRef.current) pdfInputRef.current.value = '';
-                                    }}
-                                    className="ml-2 p-1 bg-red-100 text-red-500 rounded-full hover:bg-red-200"
-                                >
+                    <>
+                        {error && (
+                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700 text-sm font-medium animate-fade-in">
+                                <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                                <div className="flex-1">
+                                    <p>{error}</p>
+                                </div>
+                                <button type="button" onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded-full transition-colors">
                                     <X size={14} />
                                 </button>
                             </div>
-                        ) : (
-                            <>
-                                <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
-                                    <FileUp size={24} />
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-sm font-bold text-slate-700">Clicca per selezionare PDF</p>
-                                    <p className="text-xs text-slate-400 mt-1">Max 100MB</p>
-                                </div>
-                            </>
                         )}
-                        <input 
-                            ref={pdfInputRef}
-                            type="file" 
-                            accept="application/pdf"
-                            className={`absolute inset-0 opacity-0 cursor-pointer ${formData.fileData ? 'pointer-events-none' : ''}`}
-                            onChange={handlePdfChange}
-                        />
-                    </div>
+                        <div className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all bg-slate-50 ${error ? 'border-red-300 bg-red-50/30' : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50'}`}>
+                            {formData.fileData ? (
+                                <div className="flex items-center gap-2 text-green-600 font-bold">
+                                    <FileText size={20} />
+                                    <span>File pronto per l'invio!</span>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            setFormData({...formData, fileData: ''});
+                                            if (pdfInputRef.current) pdfInputRef.current.value = '';
+                                        }}
+                                        className="ml-2 p-1 bg-red-100 text-red-500 rounded-full hover:bg-red-200"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="p-3 bg-blue-100 text-blue-600 rounded-full">
+                                        <FileUp size={24} />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-bold text-slate-700">Clicca per selezionare PDF</p>
+                                        <p className="text-xs text-slate-400 mt-1">Max 100MB</p>
+                                    </div>
+                                </>
+                            )}
+                            <input 
+                                ref={pdfInputRef}
+                                type="file" 
+                                accept="application/pdf"
+                                className={`absolute inset-0 opacity-0 cursor-pointer ${formData.fileData ? 'pointer-events-none' : ''}`}
+                                onChange={handlePdfChange}
+                            />
+                        </div>
+                    </>
                 )}
             </div>
 

@@ -27,8 +27,8 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
       </div>
       
       {type === 'note' ? (
-        // LIST VIEW FOR NOTES
-        <div className="flex flex-col gap-2">
+        // LIST VIEW FOR NOTES - Adjusted grid for notes as well if needed, but list is usually fine
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {items.map((item) => (
             <ResourceRow 
               key={item.id} 
@@ -40,7 +40,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
         </div>
       ) : (
         // GRID VIEW FOR BOOKS
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
           {items.map((item) => (
             <ResourceCard 
               key={item.id} 
@@ -56,7 +56,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
   );
 };
 
-// --- COMPONENT: ROW (For Notes) ---
+// --- COMPONENT: ROW (For Notes) - Now slightly more card-like for the grid layout ---
 interface ActionProps {
     item: ResourceItem;
     onEdit: () => void;
@@ -65,7 +65,7 @@ interface ActionProps {
 
 const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
   return (
-    <div className="group relative bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center p-3 gap-4">
+    <div className="group relative bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center p-3 gap-3">
       
       {/* Clickable Link Layer */}
       <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
@@ -80,17 +80,17 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
       </div>
 
       {/* Main Info */}
-      <div className="flex-grow min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 pointer-events-none">
-         <h4 className="font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors text-sm sm:text-base">
+      <div className="flex-grow min-w-0 flex flex-col gap-0.5 pointer-events-none">
+         <h4 className="font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors text-sm">
             {item.title}
          </h4>
          
-         <div className="flex items-center gap-3">
+         <div className="flex items-center gap-2">
              <div className="transform scale-90 origin-left">
                 <Badge label={item.category} color={item.categoryColor} />
              </div>
              {item.year && (
-                 <span className="text-xs text-slate-400 font-medium whitespace-nowrap">
+                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
                     {item.year}
                  </span>
              )}
@@ -98,7 +98,7 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
       </div>
 
       {/* Actions (Hover only) */}
-      <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 bg-white/50 backdrop-blur-sm rounded-l-lg">
+      <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 bg-white/80 backdrop-blur-sm rounded-l-lg ml-auto">
         <a 
             href={item.url} 
             target="_blank" 
@@ -109,7 +109,6 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
         >
             <Download size={14} />
         </a>
-        <div className="w-px h-3 bg-slate-200 mx-1"></div>
         <button 
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -173,17 +172,19 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
       <div className="p-5 flex gap-4 h-full pointer-events-none">
         {/* Left Column: Main Info */}
         <div className="flex-1 flex flex-col">
-           {/* Top Row: Icon & Badge */}
-          <div className="flex justify-between items-start mb-3">
-            <div className={`p-2 rounded-lg ${type === 'note' ? 'bg-blue-50' : 'bg-violet-50'}`}>
-              {item.icon ? (
-                <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
-              ) : (
-                type === 'note' ? <FileText size={20} className="text-blue-600" /> : <BookOpen size={20} className="text-violet-600" />
-              )}
-            </div>
-             {!item.coverImage && <Badge label={item.category} color={item.categoryColor} />}
-          </div>
+           {/* Top Row: Icon & Badge - ONLY SHOW IF NO COVER IMAGE */}
+           {!item.coverImage && (
+              <div className="flex justify-between items-start mb-3">
+                <div className={`p-2 rounded-lg ${type === 'note' ? 'bg-blue-50' : 'bg-violet-50'}`}>
+                  {item.icon ? (
+                    <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
+                  ) : (
+                    type === 'note' ? <FileText size={20} className="text-blue-600" /> : <BookOpen size={20} className="text-violet-600" />
+                  )}
+                </div>
+                 <Badge label={item.category} color={item.categoryColor} />
+              </div>
+           )}
 
           {/* Main Content */}
           <div className="flex-grow">

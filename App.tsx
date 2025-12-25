@@ -85,13 +85,13 @@ const App: React.FC = () => {
   const books = filteredResources.filter(r => r.type === 'book');
 
   return (
-    <div className="min-h-screen pb-32 selection:bg-blue-100 selection:text-blue-900 flex flex-col">
+    <div className="min-h-screen selection:bg-blue-100 selection:text-blue-900 flex flex-col">
       <Header />
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-8 flex-grow w-full">
+      <main className="w-full px-6 lg:px-12 flex-1 pb-12">
         
-        {/* Search & Filter Section */}
-        <div className="max-w-4xl mx-auto mb-12">
+        {/* Search & Filter Section - Kept centered for UX but slightly wider */}
+        <div className="max-w-5xl mx-auto mb-12">
             
             {/* Search Bar */}
             <div className="relative group mb-6">
@@ -153,15 +153,30 @@ const App: React.FC = () => {
         ) : (
           <div className="space-y-16">
             {filteredResources.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-                <p className="text-xl text-slate-500 font-medium mb-2">Nessuna risorsa trovata</p>
-                <p className="text-slate-400 text-sm mb-6">Non ci sono risultati per i filtri selezionati.</p>
-                <button 
-                  onClick={() => { setSearchTerm(''); setSelectedCategory(null); }}
-                  className="text-blue-600 font-bold hover:underline bg-blue-50 px-6 py-2 rounded-full"
-                >
-                  Rimuovi tutti i filtri
-                </button>
+              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200 max-w-4xl mx-auto">
+                {resources.length === 0 ? (
+                     <>
+                        <p className="text-xl text-slate-500 font-medium mb-2">La raccolta è vuota</p>
+                        <p className="text-slate-400 text-sm mb-6">Non ci sono ancora risorse condivise. Inizia tu!</p>
+                        <button 
+                          onClick={() => setIsModalOpen(true)}
+                          className="text-white font-bold bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
+                        >
+                          Aggiungi la prima risorsa
+                        </button>
+                     </>
+                ) : (
+                     <>
+                        <p className="text-xl text-slate-500 font-medium mb-2">Nessuna risorsa trovata</p>
+                        <p className="text-slate-400 text-sm mb-6">Non ci sono risultati per i filtri selezionati.</p>
+                        <button 
+                          onClick={() => { setSearchTerm(''); setSelectedCategory(null); }}
+                          className="text-blue-600 font-bold hover:underline bg-blue-50 px-6 py-2 rounded-full"
+                        >
+                          Rimuovi tutti i filtri
+                        </button>
+                     </>
+                )}
               </div>
             ) : (
               <>
@@ -190,8 +205,8 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="mt-20 py-8 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-center gap-6 text-sm text-slate-500">
+      <footer className="mt-auto py-8 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+        <div className="w-full px-6 lg:px-12 flex flex-col md:flex-row items-center justify-center gap-6 text-sm text-slate-500">
             <div className="flex items-center gap-2">
                 <Mail size={16} className="text-slate-400" />
                 <span>
