@@ -51,7 +51,10 @@ export const getResources = async (): Promise<ResourceItem[]> => {
   }
 };
 
-export const addResource = async (resource: Omit<ResourceItem, 'id'> & { fileData?: string }): Promise<ResourceItem> => {
+export const addResource = async (
+    resource: Omit<ResourceItem, 'id'> & { fileData?: string }, 
+    onProgress?: (percentage: number) => void
+): Promise<ResourceItem> => {
   const tempId = Math.random().toString(36).substr(2, 9);
   const newResourceLocal = { ...resource, id: tempId };
 
@@ -78,7 +81,12 @@ export const addResource = async (resource: Omit<ResourceItem, 'id'> & { fileDat
             const chunk = resource.fileData.substring(start, end);
             
             await uploadChunk(uploadId, i, chunk);
-            console.log(`Uploaded chunk ${i + 1}/${totalChunks}`);
+            
+            // Calculate and report progress
+            const progress = Math.round(((i + 1) / totalChunks) * 100);
+            if (onProgress) onProgress(progress);
+            
+            console.log(`Uploaded chunk ${i + 1}/${totalChunks} (${progress}%)`);
         }
 
         // Finalize creation pointing to the chunks
@@ -99,11 +107,13 @@ export const addResource = async (resource: Omit<ResourceItem, 'id'> & { fileDat
 
     } else {
         // STANDARD UPLOAD (Small files)
+        if (onProgress) onProgress(10); // Start progress
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: 'create', ...newResourceLocal }),
         });
+        if (onProgress) onProgress(100); // Complete
         const result = await response.json();
         return result.status === 'success' ? result.data : (newResourceLocal as ResourceItem);
     }

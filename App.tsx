@@ -29,7 +29,10 @@ const App: React.FC = () => {
     loadData();
   }, []);
 
-  const handleCreateOrUpdate = async (formData: Omit<ResourceItem, 'id'>) => {
+  const handleCreateOrUpdate = async (
+    formData: Omit<ResourceItem, 'id'>, 
+    onProgress?: (percentage: number) => void
+  ) => {
     if (editingItem) {
         // UPDATE MODE
         const updatedResource = { ...formData, id: editingItem.id } as ResourceItem;
@@ -37,7 +40,8 @@ const App: React.FC = () => {
         await updateResource(updatedResource);
     } else {
         // CREATE MODE
-        const addedItem = await addResource(formData);
+        // We pass the onProgress callback down to the service
+        const addedItem = await addResource(formData, onProgress);
         setResources(prev => [addedItem, ...prev]);
     }
     setEditingItem(null);

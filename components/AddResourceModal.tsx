@@ -5,7 +5,8 @@ import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, 
 interface AddResourceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<ResourceItem, 'id'>) => Promise<void>;
+  // Updated signature to accept progress callback
+  onSubmit: (data: Omit<ResourceItem, 'id'>, onProgress?: (percentage: number) => void) => Promise<void>;
   initialData?: ResourceItem | null;
 }
 
@@ -33,6 +34,7 @@ const PRESET_ICONS = [
 
 export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // Track progress
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +59,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   useEffect(() => {
     if (isOpen) {
         setError(null);
+        setUploadProgress(0);
         if (initialData) {
             setFormData({
                 type: initialData.type,
@@ -127,6 +130,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setUploadProgress(0);
     
     // Validation
     if (sourceType === 'url' && !formData.url) {
@@ -154,7 +158,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     }
 
     try {
-        await onSubmit(resourceData);
+        await onSubmit(resourceData, (progress) => {
+            setUploadProgress(progress);
+        });
         setLoading(false);
         onClose();
     } catch (err) {
@@ -460,6 +466,22 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
           </div>
 
+          {/* Progress Bar Display (Only when loading and uploading a file) */}
+          {loading && sourceType === 'file' && uploadProgress > 0 && (
+            <div className="animate-fade-in">
+                <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                    <span>Caricamento PDF...</span>
+                    <span>{uploadProgress}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                        style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                </div>
+            </div>
+          )}
+
           <button 
             type="submit" 
             disabled={loading}
@@ -468,7 +490,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             {loading ? (
                 <>
                     <Loader2 className="animate-spin" size={20} />
-                    <span>Caricamento {formData.fileData ? 'File...' : '...'}</span>
+                    <span>{formData.fileData && uploadProgress < 100 ? 'Invio in corso...' : 'Elaborazione...'}</span>
                 </>
             ) : (
                 <>
