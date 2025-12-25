@@ -1,7 +1,7 @@
 import { ResourceItem, ResourceCategory, TagColor } from './types';
 
 // TODO: Incolla qui l'URL della tua Web App di Google Apps Script dopo il deploy
-export const GOOGLE_APPS_SCRIPT_URL = ''; 
+export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSQKfV7uCS_0CmWiEQFiQ1ksfbWWnSsFYQSFm3qOQ2TagH84dOyHYJxxkNbcA-xoez/exec'; 
 
 export const INITIAL_RESOURCES: ResourceItem[] = [];
 

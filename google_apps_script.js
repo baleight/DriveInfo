@@ -95,16 +95,17 @@ function handleRequest(e) {
         // Handle Icon Image (Base64 -> Drive)
         const finalIconUrl = processFile(data.icon, id + "_icon");
 
-        // Handle Main File (Base64 -> Drive)
-        let resourceUrl = data.url;
-        if (data.fileData) {
+        // Handle Main File (Base64 -> Drive) vs URL
+        // Prioritize fileData ONLY if it has significant length (valid base64), otherwise use the provided URL
+        let resourceUrl = data.url ? data.url.trim() : '';
+        if (data.fileData && data.fileData.length > 50) {
             resourceUrl = processFile(data.fileData, id + "_file");
         }
         
         const row = [
           id,
           data.title || '',
-          resourceUrl || '',
+          resourceUrl,
           data.description || '',
           data.year || '',
           data.dateAdded || timestamp,
@@ -156,9 +157,13 @@ function handleRequest(e) {
                 finalIconUrl = data.icon;
             }
 
-            let resourceUrl = data.url;
+            let resourceUrl = currentValues[2]; // Default to existing
+            // If new file uploaded
             if (data.fileData && data.fileData.startsWith('data:')) {
                  resourceUrl = processFile(data.fileData, idToEdit + "_file");
+            } else if (data.url) {
+                // If URL text changed
+                resourceUrl = data.url.trim();
             }
             
             const updatedRow = [

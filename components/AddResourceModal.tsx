@@ -128,6 +128,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     e.preventDefault();
     setError(null);
     
+    // Validation
     if (sourceType === 'url' && !formData.url) {
         setError("Inserisci un URL valido.");
         return;
@@ -139,13 +140,17 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
     setLoading(true);
 
+    // Prepare payload
     const resourceData: any = { 
         ...formData,
         dateAdded: initialData?.dateAdded || new Date().toLocaleDateString('en-GB'),
     };
 
+    // STRICT CLEANUP based on source type
     if (sourceType === 'url') {
-        resourceData.fileData = '';
+        resourceData.fileData = ''; // Ensure no file data is sent
+    } else {
+        resourceData.url = ''; // Ensure no url is sent (backend will generate one from file)
     }
 
     try {
