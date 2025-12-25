@@ -1,7 +1,7 @@
 import React from 'react';
 import { ResourceItem } from '../types';
 import { Badge } from './Badge';
-import { FileText, BookOpen, ExternalLink, Calendar, User, Pencil, Trash2, ChevronRight, Download } from 'lucide-react';
+import { FileText, BookOpen, ExternalLink, Calendar, User, Pencil, Trash2, ChevronRight, Download, ImageOff } from 'lucide-react';
 
 interface ResourceGridProps {
   title: string;
@@ -27,7 +27,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
       </div>
       
       {type === 'note' ? (
-        // LIST VIEW FOR NOTES - Adjusted grid for notes as well if needed, but list is usually fine
+        // LIST VIEW FOR NOTES
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {items.map((item) => (
             <ResourceRow 
@@ -56,7 +56,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
   );
 };
 
-// --- COMPONENT: ROW (For Notes) - Now slightly more card-like for the grid layout ---
+// --- COMPONENT: ROW (For Notes) ---
 interface ActionProps {
     item: ResourceItem;
     onEdit: () => void;
@@ -238,14 +238,23 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
 
         {/* Right Column: Cover Image (Only for books) */}
         {type === 'book' && item.coverImage && (
-          <div className="w-24 flex-shrink-0">
-             <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-100 relative">
+          <div className="w-28 flex-shrink-0">
+             <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
+                {/* Fallback Icon (Visible if image fails or loading) */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0">
+                    <BookOpen size={24} />
+                    <span className="text-[10px] mt-1 font-medium">Cover</span>
+                </div>
+                
+                {/* The Image */}
                 <img 
                     src={item.coverImage} 
                     alt={item.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-500 relative z-10"
                     onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
+                        e.currentTarget.style.display = 'none'; // Hide broken image, revealing fallback
                     }}
                 />
              </div>

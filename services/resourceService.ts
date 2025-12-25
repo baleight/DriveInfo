@@ -12,6 +12,23 @@ const checkApiConfigured = () => {
     return true;
 };
 
+// Helper to upload a single chunk
+const uploadChunk = async (uploadId: string, chunkIndex: number, chunkData: string) => {
+    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ 
+            action: 'upload_chunk', 
+            uploadId, 
+            chunkIndex, 
+            chunkData 
+        }),
+    });
+    const res = await response.json();
+    if (res.status !== 'success') throw new Error(`Chunk ${chunkIndex} upload failed`);
+    return res;
+};
+
 export const getResources = async (): Promise<ResourceItem[]> => {
   if (!GOOGLE_APPS_SCRIPT_URL) {
     console.warn("GOOGLE_APPS_SCRIPT_URL is not set. Using mock data.");
@@ -34,27 +51,67 @@ export const getResources = async (): Promise<ResourceItem[]> => {
   }
 };
 
-export const addResource = async (resource: Omit<ResourceItem, 'id'>): Promise<ResourceItem> => {
+export const addResource = async (resource: Omit<ResourceItem, 'id'> & { fileData?: string }): Promise<ResourceItem> => {
   const tempId = Math.random().toString(36).substr(2, 9);
   const newResourceLocal = { ...resource, id: tempId };
 
-  // Update local DB instantly for UI responsiveness
-  inMemoryDb = [newResourceLocal, ...inMemoryDb];
+  // Update local DB instantly for UI responsiveness (Optimistic UI)
+  inMemoryDb = [newResourceLocal as ResourceItem, ...inMemoryDb];
 
-  if (!checkApiConfigured()) return newResourceLocal;
+  if (!checkApiConfigured()) return newResourceLocal as ResourceItem;
 
   try {
-    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: 'create', ...newResourceLocal }),
-    });
-    const result = await response.json();
-    return result.status === 'success' ? result.data : newResourceLocal;
+    // CHUNKING LOGIC FOR LARGE FILES
+    // If fileData exists and is larger than ~2MB, use chunking to bypass GAS limits
+    if (resource.fileData && resource.fileData.length > 2 * 1024 * 1024) {
+        const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
+        const totalSize = resource.fileData.length;
+        const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+        const uploadId = `${tempId}_${Date.now()}`; // Unique upload session ID
+
+        console.log(`Starting chunked upload: ${totalChunks} chunks for ${totalSize} bytes`);
+
+        // Upload chunks sequentially
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, totalSize);
+            const chunk = resource.fileData.substring(start, end);
+            
+            await uploadChunk(uploadId, i, chunk);
+            console.log(`Uploaded chunk ${i + 1}/${totalChunks}`);
+        }
+
+        // Finalize creation pointing to the chunks
+        const resourceWithoutFile = { ...resource, fileData: '' }; // Don't send fileData again
+        
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ 
+                action: 'create', 
+                ...resourceWithoutFile, 
+                uploadId: uploadId, // Backend will use this to reassemble
+                totalChunks: totalChunks
+            }),
+        });
+        const result = await response.json();
+        return result.status === 'success' ? result.data : (newResourceLocal as ResourceItem);
+
+    } else {
+        // STANDARD UPLOAD (Small files)
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: 'create', ...newResourceLocal }),
+        });
+        const result = await response.json();
+        return result.status === 'success' ? result.data : (newResourceLocal as ResourceItem);
+    }
+
   } catch (error) {
     console.error("Add failed:", error);
     alert("Errore di connessione con Google Sheet. Riprova.");
-    return newResourceLocal;
+    return newResourceLocal as ResourceItem;
   }
 };
 
