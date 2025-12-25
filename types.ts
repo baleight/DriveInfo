@@ -30,7 +30,7 @@ export interface ResourceItem {
   description?: string; // Author for books, simple desc for notes
   year?: string;
   dateAdded?: string;
-  category: ResourceCategory;
+  category: string; // Changed from ResourceCategory to string to allow custom inputs
   categoryColor: TagColor;
   type: 'note' | 'book';
   icon?: string; // URL or emoji
