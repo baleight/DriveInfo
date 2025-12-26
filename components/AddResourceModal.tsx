@@ -113,11 +113,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // GAS memory limit is strict. 25MB is a safe upper limit for assembly.
-      const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+      // GAS memory limit is strict. 50MB is approaching the limit but feasible with chunking.
+      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
 
       if (file.size > MAX_SIZE) {
-          setError("Il file è troppo grande (Max 25MB). Per file più grandi, caricali manualmente su Google Drive e usa il 'Link Esterno'.");
+          setError("Il file è troppo grande (Max 50MB). Per file più grandi, caricali manualmente su Google Drive e usa il 'Link Esterno'.");
           if (pdfInputRef.current) pdfInputRef.current.value = '';
           return;
       }
@@ -316,7 +316,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                                     </div>
                                     <div className="text-center">
                                         <p className="text-sm font-bold text-slate-700">Clicca per selezionare PDF</p>
-                                        <p className="text-xs text-slate-400 mt-1">Max 25MB</p>
+                                        <p className="text-xs text-slate-400 mt-1">Max 50MB</p>
                                     </div>
                                 </>
                             )}

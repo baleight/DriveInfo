@@ -171,7 +171,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
 
       <div className="p-5 flex gap-4 h-full pointer-events-none">
         {/* Left Column: Main Info */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
            {/* Top Row: Icon & Badge - ONLY SHOW IF NO COVER IMAGE */}
            {!item.coverImage && (
               <div className="flex justify-between items-start mb-3">
@@ -188,7 +188,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
 
           {/* Main Content */}
           <div className="flex-grow">
-            <h4 className="font-bold text-slate-800 group-hover:text-blue-600 leading-snug mb-1 transition-colors">
+            <h4 className="font-bold text-slate-800 group-hover:text-blue-600 leading-snug mb-1 transition-colors break-words">
               {item.title}
             </h4>
             
@@ -238,7 +238,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
 
         {/* Right Column: Cover Image (Only for books) */}
         {type === 'book' && item.coverImage && (
-          <div className="w-28 flex-shrink-0">
+          <div className="w-24 sm:w-28 flex-shrink-0">
              <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
                 {/* Fallback Icon (Visible if image fails or loading) */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0">
@@ -252,7 +252,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                     alt={item.title} 
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-500 relative z-10"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
                     onError={(e) => {
                         e.currentTarget.style.display = 'none'; // Hide broken image, revealing fallback
                     }}
