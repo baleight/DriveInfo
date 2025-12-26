@@ -38,8 +38,10 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
         return res;
 
     } catch (err: any) {
+        const errStr = (err.message || err.toString()).toLowerCase().replace(/\s+/g, ' '); // Normalize spaces
+        
         // Detect Permission Error inside a chunk
-        if (err.message && (err.message.includes("Non disponi dell'autorizzazione") || err.message.includes("DriveApp"))) {
+        if (errStr.includes("autorizzazione") || errStr.includes("driveapp") || errStr.includes("permission")) {
              throw err; // Stop retrying immediately if it's a permission error
         }
 
@@ -165,11 +167,23 @@ export const addResource = async (
     console.error("Add failed:", error);
     
     // Custom error message for Permission Issues
-    const errorStr = error.toString();
-    if (errorStr.includes("Non disponi dell'autorizzazione") || errorStr.includes("DriveApp") || errorStr.includes("permissions")) {
-        alert("⚠️ ERRORE PERMESSI BACKEND ⚠️\n\nLo script Google non ha i permessi per scrivere su Drive.\n\nSOLUZIONE:\n1. Apri l'editor dello script Google.\n2. Esegui manualmente la funzione '_FORCE_AUTH'.\n3. Accetta i permessi.\n4. Fai una Nuova Distribuzione.");
+    const errorStr = (error.message || error.toString()).toLowerCase().replace(/\s+/g, ' ');
+    
+    if (errorStr.includes("autorizzazione") || errorStr.includes("driveapp") || errorStr.includes("permission")) {
+        alert(
+`⚠️ ERRORE PERMESSI GOOGLE DRIVE ⚠️
+
+Lo script backend non ha l'autorizzazione per creare file.
+
+SOLUZIONE:
+1. Vai nell'editor di Google Apps Script.
+2. Esegui la funzione '_FORCE_AUTH' e accetta i permessi (anche quelli "non sicuri").
+3. IMPORTANTE: Fai "Nuova distribuzione".
+4. Imposta "Esegui come" su "Me" (la tua email), NON "Utente che accede".
+5. Copia il nuovo URL.`
+        );
     } else {
-        alert(`Errore durante il caricamento: ${errorStr}. Riprova, magari con un file più piccolo o controlla la connessione.`);
+        alert(`Errore durante il caricamento: ${error.message || error}. Riprova, magari con un file più piccolo o controlla la connessione.`);
     }
 
     // Remove the optimistic item if it failed

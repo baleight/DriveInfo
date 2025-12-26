@@ -1,19 +1,35 @@
-// ISTRUZIONI PER L'INSTALLAZIONE:
-// 1. Incolla questo codice in Code.gs (SOSTITUISCI TUTTO IL CODICE ESISTENTE)
-// 2. Seleziona la funzione '_FORCE_AUTH' dal menu in alto e premi 'Esegui' (Play).
-// 3. Accetta TUTTI i permessi (clicca Avanzate -> Apri... non sicuro -> Consenti).
-// 4. Esegui la funzione 'setupSheet' una volta per creare il foglio.
-// 5. Fai il Deploy: "Nuova distribuzione" -> Esegui come: "Me" -> Chiunque (Anyone).
+// ISTRUZIONI CRITICHE PER L'INSTALLAZIONE (LEGGI ATTENTAMENTE):
+// 1. Incolla questo codice in Code.gs (SOSTITUISCI TUTTO).
+// 2. Seleziona la funzione '_FORCE_AUTH' dal menu a tendina in alto.
+// 3. Premi 'Esegui' (il triangolo play).
+// 4. Se richiesto, clicca "Esamina autorizzazioni" -> Scegli account -> "Avanzate" -> "Apri (non sicuro)" -> "Consenti".
+// 5. DEVI veder scritto "Auth check complete" nel log in basso.
+// 6. Fai il Deploy: 
+//    - Clicca "Pubblica" (o "Distribuisci") -> "Nuova distribuzione".
+//    - Tipo: App Web.
+//    - Descrizione: "Versione con permessi drive".
+//    - Esegui come: "Me" (IMPORTANTE: Deve essere il tuo indirizzo email, NON "Utente che accede").
+//    - Chi può accedere: "Chiunque" (Anyone).
+// 7. Copia il NUOVO URL della Web App e incollalo in constants.ts.
 
 function _FORCE_AUTH() {
-  // QUESTA FUNZIONE SERVE SOLO A FORZARE LA RICHIESTA DEI PERMESSI
-  // Eseguila manualmente nell'editor una volta.
+  // QUESTA FUNZIONE FORZA LA RICHIESTA DI TUTTI I PERMESSI NECESSARI
   const doc = SpreadsheetApp.getActiveSpreadsheet();
-  console.log("Sheet permission check: OK");
+  console.log("Sheet permission: OK");
   
-  // Questo comando forza la richiesta del permesso: https://www.googleapis.com/auth/drive
-  const folders = DriveApp.getRootFolder();
-  console.log("Drive permission check: OK");
+  // 1. Permesso lettura/scrittura cartelle
+  const folders = DriveApp.getFoldersByName("Materiale_Informatica_Uploads");
+  
+  // 2. Permesso creazione file
+  const tempFile = DriveApp.createFile("temp_auth_check.txt", "Auth Check");
+  
+  // 3. Permesso condivisione (IMPORTANTE)
+  tempFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  
+  // Pulizia
+  tempFile.setTrashed(true);
+  
+  console.log("Drive Write & Share permissions: OK (Auth check complete)");
 }
 
 function setupSheet() {
@@ -108,10 +124,11 @@ function handleRequest(e) {
     if (action === 'upload_chunk') {
         try {
             const tempFileName = `temp_chunk_${data.uploadId}_${data.chunkIndex}`;
+            // This is the line that often fails if Drive permissions are missing
             uploadFolder.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
             return responseJSON({ status: 'success', chunk: data.chunkIndex });
         } catch (chunkError) {
-             // Return specific JSON error for chunks
+             // Return specific JSON error for chunks with full string
              return responseJSON({ status: 'error', message: 'Chunk save failed: ' + chunkError.toString() });
         }
     }
