@@ -12,21 +12,40 @@ const checkApiConfigured = () => {
     return true;
 };
 
-// Helper to upload a single chunk
-const uploadChunk = async (uploadId: string, chunkIndex: number, chunkData: string) => {
-    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ 
-            action: 'upload_chunk', 
-            uploadId, 
-            chunkIndex, 
-            chunkData 
-        }),
-    });
-    const res = await response.json();
-    if (res.status !== 'success') throw new Error(`Chunk ${chunkIndex} upload failed`);
-    return res;
+// Helper: Pause execution for a given time
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper: Upload a single chunk with Retry Logic
+const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkData: string, retries = 3): Promise<any> => {
+    try {
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ 
+                action: 'upload_chunk', 
+                uploadId, 
+                chunkIndex, 
+                chunkData 
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP Error ${response.status}`);
+        }
+
+        const res = await response.json();
+        if (res.status !== 'success') throw new Error(res.message || 'Unknown error');
+        return res;
+
+    } catch (err) {
+        if (retries > 0) {
+            console.warn(`Chunk ${chunkIndex} failed. Retrying in 1.5s... (${retries} attempts left)`);
+            await delay(1500); // Wait 1.5s before retrying
+            return uploadChunkWithRetry(uploadId, chunkIndex, chunkData, retries - 1);
+        } else {
+            throw err; // Out of retries, fail for real
+        }
+    }
 };
 
 export const getResources = async (): Promise<ResourceItem[]> => {
@@ -57,24 +76,21 @@ export const addResource = async (
 ): Promise<ResourceItem> => {
   const tempId = Math.random().toString(36).substr(2, 9);
   
-  // NOTE: For local optimistic UI, we keep the fileData.
-  // BUT if the backend save fails, this will disappear on refresh.
+  // Optimistic UI update
   const newResourceLocal = { ...resource, id: tempId };
-
-  // Update local DB instantly for UI responsiveness (Optimistic UI)
   inMemoryDb = [newResourceLocal as ResourceItem, ...inMemoryDb];
 
   if (!checkApiConfigured()) return newResourceLocal as ResourceItem;
 
   try {
     // CHUNKING LOGIC FOR FILES
-    // Reduced to 300KB threshold to trigger logic, but using 512KB chunks for stability.
-    if (resource.fileData && resource.fileData.length > 300 * 1024) {
-        // 512KB chunks are much safer for GAS than 1MB
-        const CHUNK_SIZE = 512 * 1024; 
+    // Threshold set low to ensure stability
+    if (resource.fileData && resource.fileData.length > 100 * 1024) {
+        // 256KB chunks are extremely safe for GAS.
+        const CHUNK_SIZE = 256 * 1024; 
         const totalSize = resource.fileData.length;
         const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
-        const uploadId = `${tempId}_${Date.now()}`; // Unique upload session ID
+        const uploadId = `${tempId}_${Date.now()}`; 
 
         console.log(`Starting chunked upload: ${totalChunks} chunks for ${totalSize} bytes`);
 
@@ -84,7 +100,11 @@ export const addResource = async (
             const end = Math.min(start + CHUNK_SIZE, totalSize);
             const chunk = resource.fileData.substring(start, end);
             
-            await uploadChunk(uploadId, i, chunk);
+            // Upload with retry mechanism
+            await uploadChunkWithRetry(uploadId, i, chunk);
+            
+            // Throttle: Add a small delay between chunks to prevent "Too Many Requests" from Google
+            await delay(300);
             
             // Calculate and report progress
             const progress = Math.round(((i + 1) / totalChunks) * 100);
@@ -93,22 +113,23 @@ export const addResource = async (
             console.log(`Uploaded chunk ${i + 1}/${totalChunks} (${progress}%)`);
         }
 
-        // Finalize creation pointing to the chunks
-        const resourceWithoutFile = { ...resource, fileData: '' }; // Don't send fileData again
+        // Finalize creation
+        const resourceWithoutFile = { ...resource, fileData: '' }; 
         
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        // Final call needs retry logic too, just in case
+        const finalizeResponse = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ 
                 action: 'create', 
                 ...resourceWithoutFile, 
-                uploadId: uploadId, // Backend will use this to reassemble
+                uploadId: uploadId, 
                 totalChunks: totalChunks
             }),
         });
-        const result = await response.json();
+
+        const result = await finalizeResponse.json();
         
-        // Update local DB with the REAL data (containing the Drive URL instead of Base64)
         if (result.status === 'success') {
             const serverItem = result.data as ResourceItem;
             inMemoryDb = inMemoryDb.map(item => item.id === tempId ? serverItem : item);
@@ -137,7 +158,7 @@ export const addResource = async (
 
   } catch (error) {
     console.error("Add failed:", error);
-    alert(`Errore di connessione: ${error}. Il file potrebbe non essere stato salvato.`);
+    alert(`Errore durante il caricamento: ${error}. Riprova, magari con un file più piccolo o controlla la connessione.`);
     // Remove the optimistic item if it failed
     inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
     throw error;

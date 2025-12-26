@@ -30,8 +30,7 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
-  // REMOVED GLOBAL LOCK. We only lock when writing to the Sheet.
-  
+  // Global catch to ensure we always return JSON
   try {
     const doc = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = doc.getSheetByName('Resources');
@@ -92,17 +91,20 @@ function handleRequest(e) {
     // Ensure upload folder exists
     const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
 
-    // 1. CHUNK UPLOAD (NO LOCK NEEDED - Writes to Drive)
+    // 1. CHUNK UPLOAD (NO LOCK NEEDED)
     if (action === 'upload_chunk') {
-        const tempFileName = `temp_chunk_${data.uploadId}_${data.chunkIndex}`;
-        // Create file directly. No sheet lock needed.
-        uploadFolder.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
-        return responseJSON({ status: 'success', chunk: data.chunkIndex });
+        try {
+            const tempFileName = `temp_chunk_${data.uploadId}_${data.chunkIndex}`;
+            uploadFolder.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
+            return responseJSON({ status: 'success', chunk: data.chunkIndex });
+        } catch (chunkError) {
+             // Return specific JSON error for chunks
+             return responseJSON({ status: 'error', message: 'Chunk save failed: ' + chunkError.toString() });
+        }
     }
 
-    // FOR ACTIONS THAT MODIFY THE SHEET, WE APPLY THE LOCK HERE
+    // LOCK ONLY FOR SHEET OPERATIONS
     const lock = LockService.getScriptLock();
-    // Wait up to 30 seconds for other processes to finish.
     const hasLock = lock.tryLock(30000); 
 
     if (!hasLock) {
@@ -147,7 +149,7 @@ function handleRequest(e) {
                     }
                     
                     if (fullBase64.length > 0) {
-                    resourceUrl = processFile(fullBase64, id + "_" + data.title + ".pdf", uploadFolder);
+                        resourceUrl = processFile(fullBase64, id + "_" + data.title + ".pdf", uploadFolder);
                     }
                 } catch (err) {
                     return responseJSON({ status: 'error', message: 'Assembly failed: ' + err.toString() });
@@ -224,7 +226,7 @@ function handleRequest(e) {
     }
 
   } catch (e) {
-    return responseJSON({ status: 'error', message: e.toString() });
+    return responseJSON({ status: 'error', message: 'Global error: ' + e.toString() });
   }
 }
 
