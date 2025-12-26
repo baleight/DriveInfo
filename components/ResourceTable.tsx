@@ -181,7 +181,8 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
             </div>
             
             {/* Download Button + Actions */}
-            <div className="relative z-10 flex items-center gap-1">
+            {/* Added pointer-events-auto here to override the parent's pointer-events-none */}
+            <div className="relative z-10 flex items-center gap-1 pointer-events-auto">
                 <a 
                     href={item.url} 
                     target="_blank" 
