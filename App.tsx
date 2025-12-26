@@ -3,13 +3,12 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
-import { ResourceItem, StorageInfo } from './types';
+import { ResourceItem } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
 import { Plus, Search, Loader2, X, Github, Mail } from 'lucide-react';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
-  const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ResourceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,7 +21,6 @@ const App: React.FC = () => {
       try {
           const result = await getResources();
           setResources(result.resources);
-          if (result.storage) setStorage(result.storage);
       } catch (e) {
           console.error("Error loading resources", e);
       } finally {
@@ -50,13 +48,10 @@ const App: React.FC = () => {
         if (result.item) {
              setResources(prev => prev.map(r => r.id === result.item.id ? result.item : r));
         }
-
-        if (result.storage) setStorage(result.storage);
     } else {
         // CREATE MODE
         const result = await addResource(formData, onProgress);
         setResources(prev => [result.item, ...prev]);
-        if (result.storage) setStorage(result.storage);
     }
     setEditingItem(null);
   };
@@ -68,8 +63,7 @@ const App: React.FC = () => {
 
   const handleDeleteClick = async (id: string) => {
       setResources(prev => prev.filter(r => r.id !== id)); // Optimistic delete
-      const result = await deleteResource(id);
-      if (result.storage) setStorage(result.storage);
+      await deleteResource(id);
   };
 
   const handleModalClose = () => {
@@ -110,7 +104,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen selection:bg-blue-100 selection:text-blue-900 flex flex-col">
-      <Header storage={storage} />
+      <Header />
 
       <main className="w-full px-6 lg:px-12 flex-1 pb-12">
         
