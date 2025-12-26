@@ -1,6 +1,6 @@
 // INSTRUCTIONS:
 // 1. Paste this code into Code.gs (REPLACE ALL EXISTING CODE)
-// 2. Run 'setupSheet' function once if you haven't already.
+// 2. Run 'setupSheet' function once.
 // 3. Deploy as Web App (New Version): Execute as Me, Access: Anyone.
 
 function setupSheet() {
@@ -15,7 +15,6 @@ function setupSheet() {
     'category', 'categoryColor', 'type', 'icon', 'coverImage'
   ];
   
-  // Set headers only if the sheet is empty
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
@@ -31,18 +30,15 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
-  // Lock increased to 2 minutes to handle large file assembly
   const lock = LockService.getScriptLock();
-  lock.tryLock(120000); 
+  lock.tryLock(30000); 
   
   try {
     const doc = SpreadsheetApp.getActiveSpreadsheet();
     let sheet = doc.getSheetByName('Resources');
-    if (!sheet) {
-        sheet = doc.getSheets()[0];
-    }
+    if (!sheet) sheet = doc.getSheets()[0];
     
-    // READ REQUEST (GET)
+    // --- READ REQUEST (GET) ---
     if (!e.postData || !e.postData.contents) {
       const rows = sheet.getDataRange().getValues();
       if (rows.length === 0) return responseJSON([]);
@@ -56,32 +52,24 @@ function handleRequest(e) {
              obj[header] = (row[colIndex] !== undefined) ? row[colIndex] : "";
         });
 
-        if (!obj.id || obj.id === "") {
-            obj.id = "row_" + (index + 2); 
-        } else {
-            obj.id = obj.id.toString(); 
-        }
+        if (!obj.id || obj.id === "") obj.id = "row_" + (index + 2); 
+        else obj.id = obj.id.toString(); 
 
-        if (!obj.type) {
-            obj.type = 'note';
-        } else {
-            obj.type = obj.type.toString().toLowerCase().trim();
-        }
+        if (!obj.type) obj.type = 'note';
+        else obj.type = obj.type.toString().toLowerCase().trim();
 
-        // Fix Manual Drive Links
-        if (obj.coverimage && typeof obj.coverimage === 'string' && obj.coverimage.includes('drive.google.com')) {
-            if (!obj.coverimage.includes('export=view')) {
-                const idMatch = obj.coverimage.match(/([a-zA-Z0-9_-]{33,})/);
-                if (idMatch && idMatch[1]) {
-                     obj.coverimage = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
-                }
+        // Fix Drive Image Links
+        if (obj.coverimage && typeof obj.coverimage === 'string' && obj.coverimage.includes('drive.google.com') && !obj.coverimage.includes('export=view')) {
+            const idMatch = obj.coverimage.match(/([a-zA-Z0-9_-]{33,})/);
+            if (idMatch && idMatch[1]) {
+                 obj.coverimage = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
             }
         }
         
         return {
             id: obj.id,
             title: obj.title,
-            url: obj.url,
+            url: obj.url, // This will now be a Drive Link for PDFs
             description: obj.description,
             year: obj.year,
             dateAdded: obj.dateadded || obj.dateAdded || "", 
@@ -97,137 +85,134 @@ function handleRequest(e) {
       return responseJSON(result);
     }
 
-    // WRITE REQUEST (POST)
+    // --- WRITE REQUEST (POST) ---
     const data = JSON.parse(e.postData.contents);
     const action = data.action || 'create';
     const timestamp = new Date().toLocaleDateString('en-GB');
+    
+    // Ensure upload folder exists
+    const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
 
-    // --- HANDLE CHUNK UPLOAD ---
-    // Stores parts of the file in temporary text files in Drive
+    // 1. CHUNK UPLOAD
     if (action === 'upload_chunk') {
         const tempFileName = `temp_chunk_${data.uploadId}_${data.chunkIndex}`;
-        // Store as text file to avoid blob overheads until final assembly
-        DriveApp.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
+        uploadFolder.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
         return responseJSON({ status: 'success', chunk: data.chunkIndex });
     }
 
-    // --- CREATE ---
+    // 2. CREATE RESOURCE
     if (action === 'create') {
         const id = Math.random().toString(36).substr(2, 9);
         
-        // Handle Cover Image (Base64 -> Drive)
-        const finalCoverImageUrl = processFile(data.coverImage, id + "_cover");
-        // Handle Icon Image (Base64 -> Drive)
-        const finalIconUrl = processFile(data.icon, id + "_icon");
+        // Handle Icons (always process to keep safe, usually tiny)
+        const finalIconUrl = data.icon ? processFile(data.icon, id + "_icon.png", uploadFolder) : "";
+
+        // Handle Cover Image:
+        // IF small (<50000 chars), keep as Base64 in cell.
+        // ELSE save to Drive to prevent row corruption.
+        let finalCoverImageUrl = "";
+        if (data.coverImage) {
+             if (data.coverImage.length < 50000) {
+                 finalCoverImageUrl = data.coverImage;
+             } else {
+                 finalCoverImageUrl = processFile(data.coverImage, id + "_cover.jpg", uploadFolder);
+             }
+        }
 
         let resourceUrl = data.url ? data.url.trim() : '';
 
-        // 1. STANDARD UPLOAD (Small files sent directly)
+        // A. SMALL FILE DIRECT UPLOAD
         if (data.fileData && data.fileData.length > 50) {
-            resourceUrl = processFile(data.fileData, id + "_file");
+            resourceUrl = processFile(data.fileData, id + "_" + data.title + ".pdf", uploadFolder);
         } 
-        // 2. CHUNKED ASSEMBLY (Large files)
+        // B. LARGE FILE ASSEMBLY (From Chunks)
         else if (data.uploadId && data.totalChunks > 0) {
             try {
-                // Reassemble base64 string from temp files
                 let fullBase64 = "";
                 for (let i = 0; i < data.totalChunks; i++) {
-                    const tempFiles = DriveApp.getFilesByName(`temp_chunk_${data.uploadId}_${i}`);
-                    if (tempFiles.hasNext()) {
-                        const file = tempFiles.next();
+                    const files = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`);
+                    if (files.hasNext()) {
+                        const file = files.next();
                         fullBase64 += file.getBlob().getDataAsString();
-                        file.setTrashed(true); // Clean up temp file
+                        file.setTrashed(true); // Delete temp chunk
+                    } else {
+                        throw new Error(`Chunk ${i} missing`);
                     }
                 }
                 
                 if (fullBase64.length > 0) {
-                   resourceUrl = processFile(fullBase64, id + "_file");
+                   resourceUrl = processFile(fullBase64, id + "_" + data.title + ".pdf", uploadFolder);
                 }
             } catch (err) {
                 return responseJSON({ status: 'error', message: 'Assembly failed: ' + err.toString() });
             }
         }
         
+        // CRITICAL: Ensure we never save Base64 to the sheet 'url' column
+        if (resourceUrl.length > 2000) {
+            return responseJSON({ status: 'error', message: 'File creation failed (URL too long)' });
+        }
+
         const row = [
-          id,
-          data.title || '',
-          resourceUrl,
-          data.description || '',
-          data.year || '',
-          data.dateAdded || timestamp,
-          data.category || 'Generale',
-          data.categoryColor || 'gray',
-          (data.type || 'note').toLowerCase(),
-          finalIconUrl || '',
-          finalCoverImageUrl
+          id, data.title || '', resourceUrl, data.description || '', data.year || '',
+          data.dateAdded || timestamp, data.category || 'Generale', data.categoryColor || 'gray',
+          (data.type || 'note').toLowerCase(), finalIconUrl, finalCoverImageUrl
         ];
+        
         sheet.appendRow(row);
         
-        return responseJSON({ status: 'success', data: { ...data, id, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } });
+        return responseJSON({ 
+            status: 'success', 
+            data: { ...data, id, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } 
+        });
     }
 
-    // --- DELETE ---
+    // 3. DELETE RESOURCE
     if (action === 'delete') {
-        const idToDelete = data.id;
-        const rowIndex = findRowIndexById(sheet, idToDelete);
-        
+        const rowIndex = findRowIndexById(sheet, data.id);
         if (rowIndex > 0) {
             sheet.deleteRow(rowIndex);
-            return responseJSON({ status: 'success', id: idToDelete });
-        } else {
-            return responseJSON({ status: 'error', message: 'ID not found' });
+            return responseJSON({ status: 'success', id: data.id });
         }
+        return responseJSON({ status: 'error', message: 'ID not found' });
     }
 
-    // --- EDIT ---
+    // 4. EDIT RESOURCE
     if (action === 'edit') {
-        const idToEdit = data.id;
-        const rowIndex = findRowIndexById(sheet, idToEdit);
-        
+        const rowIndex = findRowIndexById(sheet, data.id);
         if (rowIndex > 0) {
-            const range = sheet.getRange(rowIndex, 1, 1, 11); // Assuming 11 columns
+            const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
+            const range = sheet.getRange(rowIndex, 1, 1, 11);
             const currentValues = range.getValues()[0];
 
+            // Cover Image Edit Logic (Same hybrid approach)
             let finalCoverImageUrl = currentValues[10]; 
             if (data.coverImage && data.coverImage.startsWith('data:image')) {
-                 finalCoverImageUrl = processFile(data.coverImage, idToEdit + "_cover");
-            } else if (data.coverImage === '') {
-                 finalCoverImageUrl = ''; 
-            }
-
-            let finalIconUrl = currentValues[9];
-            if (data.icon && data.icon.startsWith('data:image')) {
-                finalIconUrl = processFile(data.icon, idToEdit + "_icon");
-            } else if (data.icon !== undefined) {
-                finalIconUrl = data.icon;
-            }
+                 if (data.coverImage.length < 50000) {
+                     finalCoverImageUrl = data.coverImage;
+                 } else {
+                     finalCoverImageUrl = processFile(data.coverImage, data.id + "_cover.jpg", uploadFolder);
+                 }
+            } else if (data.coverImage === '') { finalCoverImageUrl = ''; }
 
             let resourceUrl = currentValues[2]; 
             if (data.fileData && data.fileData.startsWith('data:')) {
-                 resourceUrl = processFile(data.fileData, idToEdit + "_file");
-            } else if (data.url) {
-                resourceUrl = data.url.trim();
-            }
+                 resourceUrl = processFile(data.fileData, data.id + "_file.pdf", uploadFolder);
+            } else if (data.url) { resourceUrl = data.url.trim(); }
             
             const updatedRow = [
-                currentValues[0], 
-                data.title,
-                resourceUrl,
-                data.description,
-                data.year,
-                currentValues[5], 
-                data.category,
-                data.categoryColor,
-                (data.type || 'note').toLowerCase(),
-                finalIconUrl,
-                finalCoverImageUrl
+                currentValues[0], data.title, resourceUrl, data.description, data.year,
+                currentValues[5], data.category, data.categoryColor,
+                (data.type || 'note').toLowerCase(), currentValues[9], finalCoverImageUrl
             ];
             
             range.setValues([updatedRow]);
-            return responseJSON({ status: 'success', data: { ...data, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } });
-        } else {
-             return responseJSON({ status: 'error', message: 'ID not found' });
+            return responseJSON({ 
+                status: 'success', 
+                data: { ...data, coverImage: finalCoverImageUrl, url: resourceUrl } 
+            });
         }
+        return responseJSON({ status: 'error', message: 'ID not found' });
     }
 
   } catch (e) {
@@ -238,25 +223,31 @@ function handleRequest(e) {
 }
 
 // --- HELPERS ---
-
 function findRowIndexById(sheet, id) {
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-        if (data[i][0] == id) {
-            return i + 1; 
-        }
+        if (data[i][0] == id) return i + 1; 
     }
     return -1;
 }
 
-function processFile(base64String, fileNameSuffix) {
+function getOrCreateFolder(folderName) {
+  const folders = DriveApp.getFoldersByName(folderName);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(folderName);
+}
+
+function processFile(base64String, fileName, folder) {
     if (!base64String || !base64String.startsWith('data:')) return base64String || '';
     try {
         const parts = base64String.split(',');
         const mimeType = parts[0].match(/:(.*?);/)[1];
-        const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, fileNameSuffix);
-        const file = DriveApp.createFile(blob);
+        const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, fileName);
+        
+        // Save to specific folder
+        const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        
         return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
     } catch (e) {
         return '';
@@ -264,6 +255,5 @@ function processFile(base64String, fileNameSuffix) {
 }
 
 function responseJSON(obj) {
-    return ContentService.createTextOutput(JSON.stringify(obj))
-        .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }

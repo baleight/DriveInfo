@@ -56,6 +56,9 @@ export const addResource = async (
     onProgress?: (percentage: number) => void
 ): Promise<ResourceItem> => {
   const tempId = Math.random().toString(36).substr(2, 9);
+  
+  // NOTE: For local optimistic UI, we keep the fileData.
+  // BUT if the backend save fails, this will disappear on refresh.
   const newResourceLocal = { ...resource, id: tempId };
 
   // Update local DB instantly for UI responsiveness (Optimistic UI)
@@ -64,10 +67,11 @@ export const addResource = async (
   if (!checkApiConfigured()) return newResourceLocal as ResourceItem;
 
   try {
-    // CHUNKING LOGIC FOR LARGE FILES
-    // If fileData exists and is larger than ~2MB, use chunking to bypass GAS limits
-    if (resource.fileData && resource.fileData.length > 2 * 1024 * 1024) {
-        const CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
+    // CHUNKING LOGIC FOR FILES
+    // Lowered threshold to 300KB to force chunking more often. 
+    // This prevents "Payload Too Large" errors and handles memory better in Google Scripts.
+    if (resource.fileData && resource.fileData.length > 300 * 1024) {
+        const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
         const totalSize = resource.fileData.length;
         const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
         const uploadId = `${tempId}_${Date.now()}`; // Unique upload session ID
@@ -103,25 +107,40 @@ export const addResource = async (
             }),
         });
         const result = await response.json();
-        return result.status === 'success' ? result.data : (newResourceLocal as ResourceItem);
+        
+        // Update local DB with the REAL data (containing the Drive URL instead of Base64)
+        if (result.status === 'success') {
+            const serverItem = result.data as ResourceItem;
+            inMemoryDb = inMemoryDb.map(item => item.id === tempId ? serverItem : item);
+            return serverItem;
+        } else {
+             throw new Error(result.message || 'Unknown error');
+        }
 
     } else {
-        // STANDARD UPLOAD (Small files)
-        if (onProgress) onProgress(10); // Start progress
+        // STANDARD UPLOAD (Very small files only)
+        if (onProgress) onProgress(10); 
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: 'create', ...newResourceLocal }),
         });
-        if (onProgress) onProgress(100); // Complete
+        if (onProgress) onProgress(100);
         const result = await response.json();
-        return result.status === 'success' ? result.data : (newResourceLocal as ResourceItem);
+        
+        if (result.status === 'success') {
+             return result.data;
+        } else {
+             throw new Error(result.message);
+        }
     }
 
   } catch (error) {
     console.error("Add failed:", error);
-    alert("Errore di connessione con Google Sheet. Riprova.");
-    return newResourceLocal as ResourceItem;
+    alert(`Errore di connessione: ${error}. Il file potrebbe non essere stato salvato.`);
+    // Remove the optimistic item if it failed
+    inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
+    throw error;
   }
 };
 

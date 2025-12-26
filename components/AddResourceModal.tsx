@@ -89,8 +89,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.size > 5 * 1024 * 1024) { 
-        setError("L'immagine di copertina è troppo grande! Il limite è 5MB.");
+    // Updated limit to 1MB as requested
+    if (file.size > 1 * 1024 * 1024) { 
+        setError("L'immagine di copertina è troppo grande! Il limite è 1MB.");
         if (fileInputRef.current) fileInputRef.current.value = '';
         return;
     }
@@ -112,10 +113,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+      // GAS memory limit is strict. 25MB is a safe upper limit for assembly.
+      const MAX_SIZE = 25 * 1024 * 1024; // 25MB
 
       if (file.size > MAX_SIZE) {
-          setError("Il file selezionato supera il limite di 100MB. Prova a comprimerlo o usa un link esterno.");
+          setError("Il file è troppo grande (Max 25MB). Per file più grandi, caricali manualmente su Google Drive e usa il 'Link Esterno'.");
           if (pdfInputRef.current) pdfInputRef.current.value = '';
           return;
       }
@@ -163,9 +165,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
         });
         setLoading(false);
         onClose();
-    } catch (err) {
+    } catch (err: any) {
         setLoading(false);
-        setError("Errore durante il salvataggio. Riprova.");
+        setError(err.message || "Errore durante il salvataggio. Riprova.");
     }
   };
 
@@ -314,7 +316,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                                     </div>
                                     <div className="text-center">
                                         <p className="text-sm font-bold text-slate-700">Clicca per selezionare PDF</p>
-                                        <p className="text-xs text-slate-400 mt-1">Max 100MB</p>
+                                        <p className="text-xs text-slate-400 mt-1">Max 25MB</p>
                                     </div>
                                 </>
                             )}
@@ -334,7 +336,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             {formData.type === 'book' && (
               <div className="group animate-fade-in">
                 <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-1.5 flex items-center gap-1">
-                  <ImageIcon size={12} /> Copertina (Max 5MB)
+                  <ImageIcon size={12} /> Copertina (Max 1MB)
                 </label>
                 
                 {!formData.coverImage ? (
