@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ResourceCategory, TagColor, ResourceItem } from '../types';
 import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
@@ -94,13 +95,14 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             img.src = event.target?.result as string;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                // Target dimensions: Max width 150px (Thumbnail size)
-                const MAX_WIDTH = 150;
-                const MAX_HEIGHT = 220;
+                // Target dimensions: Max width 120px (Thumbnail size) - Reduced to ensure Base64 fits
+                const MAX_WIDTH = 120;
+                const MAX_HEIGHT = 180;
                 
                 let width = img.width;
                 let height = img.height;
 
+                // Always resize if larger than max, maintaining aspect ratio
                 if (width > height) {
                     if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
                 } else {
@@ -112,8 +114,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 const ctx = canvas.getContext('2d');
                 if(ctx) {
                     ctx.drawImage(img, 0, 0, width, height);
-                    // Export as JPEG with 0.6 quality to save space
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    // Export as JPEG with 0.5 quality (Aggressive compression for thumbnails)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
                     resolve(dataUrl);
                 } else {
                     resolve(event.target?.result as string); // Fallback
