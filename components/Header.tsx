@@ -41,10 +41,11 @@ export const Header: React.FC<HeaderProps> = ({ storage }) => {
           <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
             Hub Risorse Condivise
           </h1>
-          <p className="mt-2 text-slate-600 max-w-xl text-lg">
-            La piattaforma open-source per gli studenti di informatica. 
-            Appunti, libri e guide curati dalla community.
-          </p>
+            <p className="mt-2 text-slate-600 max-w-xl text-lg">
+              Hub open-source per studenti di informatica: appunti, libri e guide della community. 
+              Tutti possono modificare: aggiungi e aggiorna risorse con buon senso (niente spam o cancellazioni). 
+              Miglioriamo insieme ciò che c’è e facciamolo crescere.
+            </p>
         </div>
         
         {/* Drive Storage Widget */}
