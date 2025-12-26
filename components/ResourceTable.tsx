@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { ResourceItem } from '../types';
 import { Badge } from './Badge';
-import { FileText, BookOpen, ExternalLink, Calendar, User, Pencil, Trash2, ChevronRight, Download, ImageOff } from 'lucide-react';
+import { FileText, BookOpen, Download, Pencil, Trash2, User, Calendar } from 'lucide-react';
 
 interface ResourceGridProps {
   title: string;
@@ -65,13 +66,13 @@ interface ActionProps {
 
 const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
   return (
-    <div className="group relative bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center p-3 gap-3">
+    <div className="group relative bg-white rounded-lg border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-start p-3 gap-3 min-h-[70px]">
       
       {/* Clickable Link Layer */}
       <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
 
-      {/* Icon */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden">
+      {/* Icon - Aligned to top to handle multi-line titles */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 overflow-hidden mt-0.5">
          {item.icon ? (
             <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
           ) : (
@@ -80,41 +81,42 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
       </div>
 
       {/* Main Info */}
-      <div className="flex-grow min-w-0 flex flex-col gap-0.5 pointer-events-none">
-         <h4 className="font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors text-sm">
+      <div className="flex-grow min-w-0 flex flex-col gap-1 pointer-events-none pr-14">
+         {/* Title: No truncate, wrap text, tighter leading */}
+         <h4 className="font-semibold text-slate-700 group-hover:text-blue-600 transition-colors text-sm leading-snug break-words">
             {item.title}
          </h4>
          
-         <div className="flex items-center gap-2">
+         <div className="flex flex-wrap items-center gap-2 mt-auto">
              <div className="transform scale-90 origin-left">
                 <Badge label={item.category} color={item.categoryColor} />
              </div>
              {item.year && (
-                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                 <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-1 rounded">
                     {item.year}
                  </span>
              )}
          </div>
       </div>
 
-      {/* Actions (Hover only) */}
-      <div className="relative z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 bg-white/80 backdrop-blur-sm rounded-l-lg ml-auto">
+      {/* Actions (Hover only) - HIGHLY COMPRESSED */}
+      <div className="absolute top-2 right-2 z-10 flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 backdrop-blur-sm rounded-md shadow-sm border border-slate-100 p-0.5">
         <a 
             href={item.url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="p-1.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+            className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
             title="Scarica"
             onClick={(e) => e.stopPropagation()}
         >
-            <Download size={14} />
+            <Download size={13} strokeWidth={2.5} />
         </a>
         <button 
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+            className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
             title="Modifica"
         >
-            <Pencil size={14} />
+            <Pencil size={13} strokeWidth={2.5} />
         </button>
         <button 
             onClick={(e) => { 
@@ -122,10 +124,10 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
                 e.preventDefault(); 
                 if(confirm('Eliminare questa risorsa?')) onDelete(); 
             }}
-            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
             title="Elimina"
         >
-            <Trash2 size={14} />
+            <Trash2 size={13} strokeWidth={2.5} />
         </button>
       </div>
     </div>

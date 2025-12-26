@@ -29,17 +29,39 @@ function setupSheet() {
 
 function getStorageInfo() {
   // FIXED LIMIT: 15 GB (in bytes)
-  const LIMIT = 15 * 1024 * 1024 * 1024; // 16,106,127,360 bytes
+  const LIMIT = 15 * 1024 * 1024 * 1024; // 15 GB
+  
+  let used = 0;
   
   try {
-    return {
-      used: DriveApp.getStorageUsed(),
-      limit: LIMIT
-    };
+    // Attempt 1: Get Global Drive Usage
+    used = DriveApp.getStorageUsed();
   } catch (e) {
-    // If DriveApp fails, return 0 used but keep limit correct
-    return { used: 0, limit: LIMIT, error: e.toString() };
+    console.log("Error fetching global storage: " + e.toString());
   }
+
+  // Attempt 2: If used is 0 (which is suspicious if files exist) or failed, 
+  // calculate the size of the specific Upload Folder manually.
+  // This ensures the user sees at least the space used by THIS app.
+  if (!used || used === 0) {
+    try {
+      const folders = DriveApp.getFoldersByName("Materiale_Informatica_Uploads");
+      if (folders.hasNext()) {
+        const folder = folders.next();
+        const files = folder.getFiles();
+        while (files.hasNext()) {
+          used += files.next().getSize();
+        }
+      }
+    } catch(e) {
+      console.log("Error calculating folder size: " + e.toString());
+    }
+  }
+
+  return {
+    used: used,
+    limit: LIMIT
+  };
 }
 
 function doGet(e) { return handleRequest(e); }
