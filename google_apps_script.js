@@ -30,8 +30,7 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
-  const lock = LockService.getScriptLock();
-  lock.tryLock(30000); 
+  // REMOVED GLOBAL LOCK. We only lock when writing to the Sheet.
   
   try {
     const doc = SpreadsheetApp.getActiveSpreadsheet();
@@ -69,7 +68,7 @@ function handleRequest(e) {
         return {
             id: obj.id,
             title: obj.title,
-            url: obj.url, // This will now be a Drive Link for PDFs
+            url: obj.url, 
             description: obj.description,
             year: obj.year,
             dateAdded: obj.dateadded || obj.dateAdded || "", 
@@ -93,132 +92,139 @@ function handleRequest(e) {
     // Ensure upload folder exists
     const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
 
-    // 1. CHUNK UPLOAD
+    // 1. CHUNK UPLOAD (NO LOCK NEEDED - Writes to Drive)
     if (action === 'upload_chunk') {
         const tempFileName = `temp_chunk_${data.uploadId}_${data.chunkIndex}`;
+        // Create file directly. No sheet lock needed.
         uploadFolder.createFile(tempFileName, data.chunkData, MimeType.PLAIN_TEXT);
         return responseJSON({ status: 'success', chunk: data.chunkIndex });
     }
 
-    // 2. CREATE RESOURCE
-    if (action === 'create') {
-        const id = Math.random().toString(36).substr(2, 9);
-        
-        // Handle Icons (always process to keep safe, usually tiny)
-        const finalIconUrl = data.icon ? processFile(data.icon, id + "_icon.png", uploadFolder) : "";
+    // FOR ACTIONS THAT MODIFY THE SHEET, WE APPLY THE LOCK HERE
+    const lock = LockService.getScriptLock();
+    // Wait up to 30 seconds for other processes to finish.
+    const hasLock = lock.tryLock(30000); 
 
-        // Handle Cover Image:
-        // IF small (<50000 chars), keep as Base64 in cell.
-        // ELSE save to Drive to prevent row corruption.
-        let finalCoverImageUrl = "";
-        if (data.coverImage) {
-             if (data.coverImage.length < 50000) {
-                 finalCoverImageUrl = data.coverImage;
-             } else {
-                 finalCoverImageUrl = processFile(data.coverImage, id + "_cover.jpg", uploadFolder);
-             }
-        }
-
-        let resourceUrl = data.url ? data.url.trim() : '';
-
-        // A. SMALL FILE DIRECT UPLOAD
-        if (data.fileData && data.fileData.length > 50) {
-            resourceUrl = processFile(data.fileData, id + "_" + data.title + ".pdf", uploadFolder);
-        } 
-        // B. LARGE FILE ASSEMBLY (From Chunks)
-        else if (data.uploadId && data.totalChunks > 0) {
-            try {
-                let fullBase64 = "";
-                for (let i = 0; i < data.totalChunks; i++) {
-                    const files = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`);
-                    if (files.hasNext()) {
-                        const file = files.next();
-                        fullBase64 += file.getBlob().getDataAsString();
-                        file.setTrashed(true); // Delete temp chunk
-                    } else {
-                        throw new Error(`Chunk ${i} missing`);
-                    }
-                }
-                
-                if (fullBase64.length > 0) {
-                   resourceUrl = processFile(fullBase64, id + "_" + data.title + ".pdf", uploadFolder);
-                }
-            } catch (err) {
-                return responseJSON({ status: 'error', message: 'Assembly failed: ' + err.toString() });
-            }
-        }
-        
-        // CRITICAL: Ensure we never save Base64 to the sheet 'url' column
-        if (resourceUrl.length > 2000) {
-            return responseJSON({ status: 'error', message: 'File creation failed (URL too long)' });
-        }
-
-        const row = [
-          id, data.title || '', resourceUrl, data.description || '', data.year || '',
-          data.dateAdded || timestamp, data.category || 'Generale', data.categoryColor || 'gray',
-          (data.type || 'note').toLowerCase(), finalIconUrl, finalCoverImageUrl
-        ];
-        
-        sheet.appendRow(row);
-        
-        return responseJSON({ 
-            status: 'success', 
-            data: { ...data, id, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } 
-        });
+    if (!hasLock) {
+        return responseJSON({ status: 'error', message: 'Server busy, please try again.' });
     }
 
-    // 3. DELETE RESOURCE
-    if (action === 'delete') {
-        const rowIndex = findRowIndexById(sheet, data.id);
-        if (rowIndex > 0) {
-            sheet.deleteRow(rowIndex);
-            return responseJSON({ status: 'success', id: data.id });
-        }
-        return responseJSON({ status: 'error', message: 'ID not found' });
-    }
-
-    // 4. EDIT RESOURCE
-    if (action === 'edit') {
-        const rowIndex = findRowIndexById(sheet, data.id);
-        if (rowIndex > 0) {
-            const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
-            const range = sheet.getRange(rowIndex, 1, 1, 11);
-            const currentValues = range.getValues()[0];
-
-            // Cover Image Edit Logic (Same hybrid approach)
-            let finalCoverImageUrl = currentValues[10]; 
-            if (data.coverImage && data.coverImage.startsWith('data:image')) {
-                 if (data.coverImage.length < 50000) {
-                     finalCoverImageUrl = data.coverImage;
-                 } else {
-                     finalCoverImageUrl = processFile(data.coverImage, data.id + "_cover.jpg", uploadFolder);
-                 }
-            } else if (data.coverImage === '') { finalCoverImageUrl = ''; }
-
-            let resourceUrl = currentValues[2]; 
-            if (data.fileData && data.fileData.startsWith('data:')) {
-                 resourceUrl = processFile(data.fileData, data.id + "_file.pdf", uploadFolder);
-            } else if (data.url) { resourceUrl = data.url.trim(); }
+    try {
+        // 2. CREATE RESOURCE
+        if (action === 'create') {
+            const id = Math.random().toString(36).substr(2, 9);
             
-            const updatedRow = [
-                currentValues[0], data.title, resourceUrl, data.description, data.year,
-                currentValues[5], data.category, data.categoryColor,
-                (data.type || 'note').toLowerCase(), currentValues[9], finalCoverImageUrl
+            const finalIconUrl = data.icon ? processFile(data.icon, id + "_icon.png", uploadFolder) : "";
+
+            let finalCoverImageUrl = "";
+            if (data.coverImage) {
+                if (data.coverImage.length < 50000) {
+                    finalCoverImageUrl = data.coverImage;
+                } else {
+                    finalCoverImageUrl = processFile(data.coverImage, id + "_cover.jpg", uploadFolder);
+                }
+            }
+
+            let resourceUrl = data.url ? data.url.trim() : '';
+
+            // A. SMALL FILE DIRECT UPLOAD
+            if (data.fileData && data.fileData.length > 50) {
+                resourceUrl = processFile(data.fileData, id + "_" + data.title + ".pdf", uploadFolder);
+            } 
+            // B. LARGE FILE ASSEMBLY (From Chunks)
+            else if (data.uploadId && data.totalChunks > 0) {
+                try {
+                    let fullBase64 = "";
+                    for (let i = 0; i < data.totalChunks; i++) {
+                        const files = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`);
+                        if (files.hasNext()) {
+                            const file = files.next();
+                            fullBase64 += file.getBlob().getDataAsString();
+                            file.setTrashed(true); // Delete temp chunk
+                        } else {
+                            throw new Error(`Chunk ${i} missing`);
+                        }
+                    }
+                    
+                    if (fullBase64.length > 0) {
+                    resourceUrl = processFile(fullBase64, id + "_" + data.title + ".pdf", uploadFolder);
+                    }
+                } catch (err) {
+                    return responseJSON({ status: 'error', message: 'Assembly failed: ' + err.toString() });
+                }
+            }
+            
+            if (resourceUrl.length > 2000) {
+                return responseJSON({ status: 'error', message: 'File creation failed (URL too long)' });
+            }
+
+            const row = [
+            id, data.title || '', resourceUrl, data.description || '', data.year || '',
+            data.dateAdded || timestamp, data.category || 'Generale', data.categoryColor || 'gray',
+            (data.type || 'note').toLowerCase(), finalIconUrl, finalCoverImageUrl
             ];
             
-            range.setValues([updatedRow]);
+            sheet.appendRow(row);
+            
             return responseJSON({ 
                 status: 'success', 
-                data: { ...data, coverImage: finalCoverImageUrl, url: resourceUrl } 
+                data: { ...data, id, coverImage: finalCoverImageUrl, icon: finalIconUrl, url: resourceUrl } 
             });
         }
-        return responseJSON({ status: 'error', message: 'ID not found' });
+
+        // 3. DELETE RESOURCE
+        if (action === 'delete') {
+            const rowIndex = findRowIndexById(sheet, data.id);
+            if (rowIndex > 0) {
+                sheet.deleteRow(rowIndex);
+                return responseJSON({ status: 'success', id: data.id });
+            }
+            return responseJSON({ status: 'error', message: 'ID not found' });
+        }
+
+        // 4. EDIT RESOURCE
+        if (action === 'edit') {
+            const rowIndex = findRowIndexById(sheet, data.id);
+            if (rowIndex > 0) {
+                const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
+                const range = sheet.getRange(rowIndex, 1, 1, 11);
+                const currentValues = range.getValues()[0];
+
+                let finalCoverImageUrl = currentValues[10]; 
+                if (data.coverImage && data.coverImage.startsWith('data:image')) {
+                    if (data.coverImage.length < 50000) {
+                        finalCoverImageUrl = data.coverImage;
+                    } else {
+                        finalCoverImageUrl = processFile(data.coverImage, data.id + "_cover.jpg", uploadFolder);
+                    }
+                } else if (data.coverImage === '') { finalCoverImageUrl = ''; }
+
+                let resourceUrl = currentValues[2]; 
+                if (data.fileData && data.fileData.startsWith('data:')) {
+                    resourceUrl = processFile(data.fileData, data.id + "_file.pdf", uploadFolder);
+                } else if (data.url) { resourceUrl = data.url.trim(); }
+                
+                const updatedRow = [
+                    currentValues[0], data.title, resourceUrl, data.description, data.year,
+                    currentValues[5], data.category, data.categoryColor,
+                    (data.type || 'note').toLowerCase(), currentValues[9], finalCoverImageUrl
+                ];
+                
+                range.setValues([updatedRow]);
+                return responseJSON({ 
+                    status: 'success', 
+                    data: { ...data, coverImage: finalCoverImageUrl, url: resourceUrl } 
+                });
+            }
+            return responseJSON({ status: 'error', message: 'ID not found' });
+        }
+
+    } finally {
+        lock.releaseLock();
     }
 
   } catch (e) {
     return responseJSON({ status: 'error', message: e.toString() });
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -244,7 +250,6 @@ function processFile(base64String, fileName, folder) {
         const mimeType = parts[0].match(/:(.*?);/)[1];
         const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, fileName);
         
-        // Save to specific folder
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         

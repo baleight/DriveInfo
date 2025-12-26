@@ -68,10 +68,10 @@ export const addResource = async (
 
   try {
     // CHUNKING LOGIC FOR FILES
-    // Lowered threshold to 300KB to force chunking more often. 
-    // This prevents "Payload Too Large" errors and handles memory better in Google Scripts.
+    // Reduced to 300KB threshold to trigger logic, but using 512KB chunks for stability.
     if (resource.fileData && resource.fileData.length > 300 * 1024) {
-        const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
+        // 512KB chunks are much safer for GAS than 1MB
+        const CHUNK_SIZE = 512 * 1024; 
         const totalSize = resource.fileData.length;
         const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
         const uploadId = `${tempId}_${Date.now()}`; // Unique upload session ID
