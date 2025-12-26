@@ -37,7 +37,12 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
         if (res.status !== 'success') throw new Error(res.message || 'Unknown error');
         return res;
 
-    } catch (err) {
+    } catch (err: any) {
+        // Detect Permission Error inside a chunk
+        if (err.message && (err.message.includes("Non disponi dell'autorizzazione") || err.message.includes("DriveApp"))) {
+             throw err; // Stop retrying immediately if it's a permission error
+        }
+
         if (retries > 0) {
             console.warn(`Chunk ${chunkIndex} failed. Retrying in 1.5s... (${retries} attempts left)`);
             await delay(1500); // Wait 1.5s before retrying
@@ -156,9 +161,17 @@ export const addResource = async (
         }
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Add failed:", error);
-    alert(`Errore durante il caricamento: ${error}. Riprova, magari con un file più piccolo o controlla la connessione.`);
+    
+    // Custom error message for Permission Issues
+    const errorStr = error.toString();
+    if (errorStr.includes("Non disponi dell'autorizzazione") || errorStr.includes("DriveApp") || errorStr.includes("permissions")) {
+        alert("⚠️ ERRORE PERMESSI BACKEND ⚠️\n\nLo script Google non ha i permessi per scrivere su Drive.\n\nSOLUZIONE:\n1. Apri l'editor dello script Google.\n2. Esegui manualmente la funzione '_FORCE_AUTH'.\n3. Accetta i permessi.\n4. Fai una Nuova Distribuzione.");
+    } else {
+        alert(`Errore durante il caricamento: ${errorStr}. Riprova, magari con un file più piccolo o controlla la connessione.`);
+    }
+
     // Remove the optimistic item if it failed
     inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
     throw error;

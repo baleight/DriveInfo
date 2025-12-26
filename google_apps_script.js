@@ -1,7 +1,20 @@
-// INSTRUCTIONS:
-// 1. Paste this code into Code.gs (REPLACE ALL EXISTING CODE)
-// 2. Run 'setupSheet' function once.
-// 3. Deploy as Web App (New Version): Execute as Me, Access: Anyone.
+// ISTRUZIONI PER L'INSTALLAZIONE:
+// 1. Incolla questo codice in Code.gs (SOSTITUISCI TUTTO IL CODICE ESISTENTE)
+// 2. Seleziona la funzione '_FORCE_AUTH' dal menu in alto e premi 'Esegui' (Play).
+// 3. Accetta TUTTI i permessi (clicca Avanzate -> Apri... non sicuro -> Consenti).
+// 4. Esegui la funzione 'setupSheet' una volta per creare il foglio.
+// 5. Fai il Deploy: "Nuova distribuzione" -> Esegui come: "Me" -> Chiunque (Anyone).
+
+function _FORCE_AUTH() {
+  // QUESTA FUNZIONE SERVE SOLO A FORZARE LA RICHIESTA DEI PERMESSI
+  // Eseguila manualmente nell'editor una volta.
+  const doc = SpreadsheetApp.getActiveSpreadsheet();
+  console.log("Sheet permission check: OK");
+  
+  // Questo comando forza la richiesta del permesso: https://www.googleapis.com/auth/drive
+  const folders = DriveApp.getRootFolder();
+  console.log("Drive permission check: OK");
+}
 
 function setupSheet() {
   const doc = SpreadsheetApp.getActiveSpreadsheet();
