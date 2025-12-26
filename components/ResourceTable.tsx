@@ -149,28 +149,6 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
       {/* Clickable Area for Link */}
       <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
 
-      {/* Action Buttons (Top Right - Admin) */}
-      <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-0.5 shadow-sm border border-slate-100">
-        <button 
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
-            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
-            title="Modifica"
-        >
-            <Pencil size={14} />
-        </button>
-        <button 
-            onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                if(confirm('Sei sicuro di voler eliminare questa risorsa?')) onDelete(); 
-            }}
-            className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50"
-            title="Elimina"
-        >
-            <Trash2 size={14} />
-        </button>
-      </div>
-
       <div className="p-4 flex gap-3 h-full pointer-events-none">
         
         {/* Left Column: Content */}
@@ -202,18 +180,40 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
               )}
             </div>
             
-            {/* Download Button - Explicitly in footer, isolated from image */}
-            <div className="relative z-10">
+            {/* Download Button + Actions */}
+            <div className="relative z-10 flex items-center gap-1">
                 <a 
                     href={item.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-md transition-all border border-transparent hover:border-blue-100 shadow-sm"
+                    className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-md transition-all border border-transparent hover:border-blue-100 shadow-sm mr-1"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <span className="font-bold text-[10px] uppercase">Scarica</span>
                     <Download size={12} />
                 </a>
+
+                {/* Edit Button */}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
+                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                    title="Modifica"
+                >
+                    <Pencil size={13} strokeWidth={2.5} />
+                </button>
+
+                {/* Delete Button */}
+                <button 
+                    onClick={(e) => { 
+                        e.stopPropagation(); 
+                        e.preventDefault(); 
+                        if(confirm('Sei sicuro di voler eliminare questa risorsa?')) onDelete(); 
+                    }}
+                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                    title="Elimina"
+                >
+                    <Trash2 size={13} strokeWidth={2.5} />
+                </button>
             </div>
           </div>
         </div>

@@ -38,9 +38,19 @@ const App: React.FC = () => {
   ) => {
     if (editingItem) {
         // UPDATE MODE
-        const updatedResource = { ...formData, id: editingItem.id } as ResourceItem;
-        setResources(prev => prev.map(r => r.id === editingItem.id ? updatedResource : r));
-        const result = await updateResource(updatedResource);
+        const optimisticResource = { ...formData, id: editingItem.id } as ResourceItem;
+        
+        // Optimistic update (shows changes immediately)
+        setResources(prev => prev.map(r => r.id === editingItem.id ? optimisticResource : r));
+        
+        const result = await updateResource(optimisticResource);
+        
+        // CRITICAL FIX: Update state with actual server response.
+        // This ensures temporary Base64 images are replaced with permanent Drive URLs.
+        if (result.item) {
+             setResources(prev => prev.map(r => r.id === result.item.id ? result.item : r));
+        }
+
         if (result.storage) setStorage(result.storage);
     } else {
         // CREATE MODE
