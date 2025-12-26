@@ -4,6 +4,7 @@ import { ResourceItem, StorageInfo, ApiResponse } from '../types';
 
 // In-memory fallback if API is not configured
 let inMemoryDb: ResourceItem[] = [...INITIAL_RESOURCES];
+const FIXED_LIMIT_BYTES = 15 * 1024 * 1024 * 1024; // 15GB
 
 const checkApiConfigured = () => {
     if (!GOOGLE_APPS_SCRIPT_URL) {
@@ -60,7 +61,7 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
 export const getResources = async (): Promise<ApiResponse> => {
   if (!GOOGLE_APPS_SCRIPT_URL) {
     console.warn("GOOGLE_APPS_SCRIPT_URL is not set. Using mock data.");
-    return new Promise((resolve) => setTimeout(() => resolve({ resources: [...inMemoryDb] }), 300));
+    return new Promise((resolve) => setTimeout(() => resolve({ resources: [...inMemoryDb], storage: { used: 0, limit: FIXED_LIMIT_BYTES } }), 300));
   }
 
   try {
@@ -68,23 +69,26 @@ export const getResources = async (): Promise<ApiResponse> => {
     if (!response.ok) throw new Error('Network response was not ok');
     const json = await response.json();
     
+    // Default fallback storage if API misses it
+    const defaultStorage = { used: 0, limit: FIXED_LIMIT_BYTES };
+
     // Handle new format { status: 'success', data: [], storage: {} }
     if (json.status === 'success') {
         return {
             resources: json.data || [],
-            storage: json.storage
+            storage: json.storage || defaultStorage
         };
     } 
     // Fallback for legacy format (direct array)
     else if (Array.isArray(json)) {
-        return { resources: json };
+        return { resources: json, storage: defaultStorage };
     }
     
-    return { resources: [...INITIAL_RESOURCES] };
+    return { resources: [...INITIAL_RESOURCES], storage: defaultStorage };
 
   } catch (error) {
     console.error("Failed to fetch resources:", error);
-    return { resources: [...inMemoryDb] };
+    return { resources: [...inMemoryDb], storage: { used: 0, limit: FIXED_LIMIT_BYTES } };
   }
 };
 

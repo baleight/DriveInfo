@@ -18,9 +18,12 @@ const formatBytes = (bytes: number, decimals = 1) => {
 
 export const Header: React.FC<HeaderProps> = ({ storage }) => {
   
-  // Calculate percentage and remaining
-  const percentage = storage && storage.limit > 0 ? (storage.used / storage.limit) * 100 : 0;
-  const remaining = storage ? storage.limit - storage.used : 0;
+  // Default values to prevent "Loading..." forever if API is slow but we know the limit
+  const limit = storage ? storage.limit : 15 * 1024 * 1024 * 1024; // Default 15GB
+  const used = storage ? storage.used : 0;
+
+  const percentage = (used / limit) * 100;
+  const remaining = limit - used;
   
   // Color logic for progress bar
   const barColor = percentage > 90 ? 'bg-red-500' : percentage > 70 ? 'bg-yellow-500' : 'bg-blue-600';
@@ -51,43 +54,35 @@ export const Header: React.FC<HeaderProps> = ({ storage }) => {
              <span className="text-xs font-bold uppercase text-slate-500 tracking-wide">Spazio Google Drive</span>
           </div>
 
-          {storage ? (
-              <div className="animate-fade-in">
-                  <div className="flex justify-between items-end mb-1">
-                      <span className="text-sm font-bold text-slate-800">{formatBytes(storage.used)}</span>
-                      <span className="text-xs text-slate-400">di {formatBytes(storage.limit)}</span>
-                  </div>
-                  
-                  {/* Progress Bar Track */}
-                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor}`} 
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                      ></div>
-                  </div>
+          <div className="animate-fade-in">
+              <div className="flex justify-between items-end mb-1">
+                  <span className="text-sm font-bold text-slate-800">{formatBytes(used)}</span>
+                  <span className="text-xs text-slate-400">su {formatBytes(limit)}</span>
+              </div>
+              
+              {/* Progress Bar Track */}
+              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ease-out ${barColor}`} 
+                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                  ></div>
+              </div>
 
-                  <div className="flex justify-between items-center text-xs">
-                     <span className={`${percentage > 90 ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
-                         {percentage.toFixed(1)}% usato
-                     </span>
-                     <span className="text-emerald-600 font-medium bg-emerald-50 px-1.5 py-0.5 rounded">
-                         {formatBytes(remaining)} liberi
-                     </span>
-                  </div>
+              <div className="flex justify-between items-center text-xs">
+                 <span className={`${percentage > 90 ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                     {percentage.toFixed(1)}% usato
+                 </span>
+                 <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                     {formatBytes(remaining)} Rimanenti
+                 </span>
               </div>
-          ) : (
-              // Loading State or Error
-              <div className="flex flex-col gap-2 py-1">
-                 <div className="w-full h-2.5 bg-slate-100 rounded-full animate-pulse"></div>
-                 <div className="flex justify-between">
-                     <div className="w-16 h-2 bg-slate-100 rounded animate-pulse"></div>
-                     <div className="w-10 h-2 bg-slate-100 rounded animate-pulse"></div>
-                 </div>
-                 <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                    <AlertCircle size={10} /> Sincronizzazione quota...
-                 </div>
-              </div>
-          )}
+              
+              {!storage && (
+                <div className="text-[10px] text-slate-300 mt-1 flex justify-end">
+                    Aggiornamento...
+                </div>
+              )}
+          </div>
         </div>
       </div>
 

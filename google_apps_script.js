@@ -28,13 +28,17 @@ function setupSheet() {
 }
 
 function getStorageInfo() {
+  // FIXED LIMIT: 15 GB (in bytes)
+  const LIMIT = 15 * 1024 * 1024 * 1024; // 16,106,127,360 bytes
+  
   try {
     return {
       used: DriveApp.getStorageUsed(),
-      limit: DriveApp.getStorageLimit()
+      limit: LIMIT
     };
   } catch (e) {
-    return { used: 0, limit: 0, error: e.toString() };
+    // If DriveApp fails, return 0 used but keep limit correct
+    return { used: 0, limit: LIMIT, error: e.toString() };
   }
 }
 
