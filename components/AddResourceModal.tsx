@@ -83,23 +83,65 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
   if (!isOpen) return null;
 
+  // --- IMAGE COMPRESSION LOGIC ---
+  // Resizes image to be small enough for Google Sheet Cell (< 50k chars)
+  const resizeImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                // Target dimensions: Max width 150px (Thumbnail size)
+                const MAX_WIDTH = 150;
+                const MAX_HEIGHT = 220;
+                
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                } else {
+                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if(ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    // Export as JPEG with 0.6 quality to save space
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    resolve(dataUrl);
+                } else {
+                    resolve(event.target?.result as string); // Fallback
+                }
+            }
+        };
+    });
+  };
+
   // Handle Cover Image (For Books)
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Updated limit to 1MB as requested
-    if (file.size > 1 * 1024 * 1024) { 
-        setError("L'immagine di copertina è troppo grande! Il limite è 1MB.");
-        if (fileInputRef.current) fileInputRef.current.value = '';
+    // We try to process even larger images by resizing them
+    if (!file.type.startsWith('image/')) {
+        setError("Per favore seleziona un file immagine valido.");
         return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        setFormData({ ...formData, coverImage: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+
+    try {
+        const resizedBase64 = await resizeImage(file);
+        setFormData({ ...formData, coverImage: resizedBase64 });
+    } catch (err) {
+        console.error("Error resizing image", err);
+        setError("Errore durante l'elaborazione dell'immagine.");
+    }
   };
 
   const removeImage = () => {
@@ -336,7 +378,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             {formData.type === 'book' && (
               <div className="group animate-fade-in">
                 <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-1.5 flex items-center gap-1">
-                  <ImageIcon size={12} /> Copertina (Max 1MB)
+                  <ImageIcon size={12} /> Copertina (Miniatura)
                 </label>
                 
                 {!formData.coverImage ? (
@@ -357,19 +399,20 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                         />
                     </div>
                 ) : (
-                    <div className="relative w-full h-32 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-                        <img src={formData.coverImage} alt="Preview" className="w-full h-full object-cover opacity-80" />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="relative w-24 h-32 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 mx-auto sm:mx-0">
+                        <img src={formData.coverImage} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity">
                             <button 
                                 type="button"
                                 onClick={removeImage}
-                                className="bg-white text-red-500 px-4 py-2 rounded-full font-bold shadow-sm hover:scale-105 transition-transform flex items-center gap-2 text-sm"
+                                className="bg-white text-red-500 p-2 rounded-full shadow-sm hover:scale-110 transition-transform"
                             >
-                                <Trash2 size={16} /> Rimuovi
+                                <Trash2 size={16} />
                             </button>
                         </div>
                     </div>
                 )}
+                <p className="text-[10px] text-slate-400 mt-1">L'immagine verrà ridimensionata automaticamente.</p>
               </div>
             )}
 

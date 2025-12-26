@@ -221,12 +221,12 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2">
                 <Mail size={16} className="text-slate-400" />
                 <span>
-                    Per info: <a href="mailto:giancatastrofe@gmail.com" className="text-blue-600 font-medium hover:underline transition-colors">giancatastrofe@gmail.com</a>
+                    Per info: <a href="mailto:giancatastrofe@gmail.com" className="text-blue-600 font-medium hover:underline transition-colors">driveunimoreinfo@gmail.com</a>
                 </span>
             </div>
             <div className="hidden md:block w-1 h-1 bg-slate-300 rounded-full"></div>
             <a 
-                href="https://github.com/giancatastrofe" 
+                href="https://github.com/baleight/DriveInfo" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 hover:text-slate-800 transition-colors group"

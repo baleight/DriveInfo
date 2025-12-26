@@ -148,10 +148,10 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
       <a href={item.url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 z-0" />
 
       {/* Action Buttons (Top Right - Admin) */}
-      <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-0.5 shadow-sm border border-slate-100">
         <button 
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }}
-            className="p-1.5 bg-white text-slate-400 hover:text-blue-600 rounded-md hover:bg-blue-50 border border-slate-200 shadow-sm"
+            className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-blue-50"
             title="Modifica"
         >
             <Pencil size={14} />
@@ -162,65 +162,45 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                 e.preventDefault(); 
                 if(confirm('Sei sicuro di voler eliminare questa risorsa?')) onDelete(); 
             }}
-            className="p-1.5 bg-white text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50 border border-slate-200 shadow-sm"
+            className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50"
             title="Elimina"
         >
             <Trash2 size={14} />
         </button>
       </div>
 
-      <div className="p-5 flex gap-4 h-full pointer-events-none">
-        {/* Left Column: Main Info */}
+      <div className="p-4 flex gap-3 h-full pointer-events-none">
+        
+        {/* Left Column: Content */}
         <div className="flex-1 flex flex-col min-w-0">
-           {/* Top Row: Icon & Badge - ONLY SHOW IF NO COVER IMAGE */}
-           {!item.coverImage && (
-              <div className="flex justify-between items-start mb-3">
-                <div className={`p-2 rounded-lg ${type === 'note' ? 'bg-blue-50' : 'bg-violet-50'}`}>
-                  {item.icon ? (
-                    <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
-                  ) : (
-                    type === 'note' ? <FileText size={20} className="text-blue-600" /> : <BookOpen size={20} className="text-violet-600" />
-                  )}
-                </div>
-                 <Badge label={item.category} color={item.categoryColor} />
-              </div>
-           )}
-
           {/* Main Content */}
           <div className="flex-grow">
-            <h4 className="font-bold text-slate-800 group-hover:text-blue-600 leading-snug mb-1 transition-colors break-words">
+            <h4 className="font-bold text-slate-800 group-hover:text-blue-600 leading-snug mb-1 transition-colors break-words text-sm sm:text-base">
               {item.title}
             </h4>
             
-            {type === 'book' && item.description && (
-              <p className="text-sm text-slate-500 line-clamp-2 mb-2 flex items-center gap-1">
+            <div className="mt-2 mb-2">
+                 <Badge label={item.category} color={item.categoryColor} />
+            </div>
+
+            {item.description && (
+              <p className="text-xs text-slate-500 line-clamp-2 mb-2 flex items-center gap-1">
                 <User size={12} /> {item.description}
               </p>
             )}
-            
-            {item.coverImage && (
-                <div className="mt-2">
-                     <Badge label={item.category} color={item.categoryColor} />
-                </div>
-            )}
           </div>
 
-          {/* Footer Info */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium">
-            <div className="flex items-center gap-3">
+          {/* Footer Info & Download */}
+          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 font-medium">
+            <div className="flex items-center gap-2">
               {item.year && (
-                <span className="flex items-center gap-1">
-                  <Calendar size={12} /> {item.year}
+                <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-slate-500">
+                  <Calendar size={10} /> {item.year}
                 </span>
-              )}
-              {item.dateAdded && type === 'book' && (
-                <span className="flex items-center gap-1">
-                <Calendar size={12} /> {item.dateAdded}
-              </span>
               )}
             </div>
             
-            {/* Download Button (Visible on Hover/Always) */}
+            {/* Download Button - Explicitly in footer, isolated from image */}
             <div className="relative z-10">
                 <a 
                     href={item.url} 
@@ -229,24 +209,23 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                     className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-md transition-all border border-transparent hover:border-blue-100 shadow-sm"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <span className="font-bold">Scarica</span>
-                    <Download size={14} />
+                    <span className="font-bold text-[10px] uppercase">Scarica</span>
+                    <Download size={12} />
                 </a>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Cover Image (Only for books) */}
+        {/* Right Column: Cover Image (Fixed Width) */}
         {type === 'book' && item.coverImage && (
-          <div className="w-24 sm:w-28 flex-shrink-0">
+          <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col">
              <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
-                {/* Fallback Icon (Visible if image fails or loading) */}
+                {/* Fallback Icon */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0">
-                    <BookOpen size={24} />
-                    <span className="text-[10px] mt-1 font-medium">Cover</span>
+                    <BookOpen size={20} />
                 </div>
                 
-                {/* The Image */}
+                {/* The Image - Object Cover to fill the box without whitespace */}
                 <img 
                     src={item.coverImage} 
                     alt={item.title} 
@@ -254,7 +233,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
                     onError={(e) => {
-                        e.currentTarget.style.display = 'none'; // Hide broken image, revealing fallback
+                        e.currentTarget.style.display = 'none'; 
                     }}
                 />
              </div>
