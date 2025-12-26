@@ -19,15 +19,37 @@ const getCoverUrl = (url: string | undefined) => {
     // 1. If Base64, return as is
     if (url.startsWith('data:')) return url;
     
-    // 2. If Google Drive URL, normalize to export=view format
+    // 2. Google Drive ID Extraction logic
+    // We try to find the ID to construct a direct link.
     if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
-        // Already in correct format?
-        if (url.includes('export=view')) return url;
+        let id = '';
 
-        // Try to extract ID
-        const idMatch = url.match(/[-\w]{25,}/);
-        if (idMatch) {
-             return `https://drive.google.com/uc?export=view&id=${idMatch[0]}`;
+        // Priority 1: Check for 'id=' query parameter
+        const idParamMatch = url.match(/[?&]id=([-\w]{25,})/);
+        if (idParamMatch) {
+            id = idParamMatch[1];
+        } 
+        // Priority 2: Check for '/d/ID' path structure
+        else {
+            const pathMatch = url.match(/\/d\/([-\w]{25,})/);
+            if (pathMatch) {
+                id = pathMatch[1];
+            }
+            // Priority 3: Fallback loose match (last resort)
+            else {
+                 const rawMatch = url.match(/[-\w]{25,}/);
+                 // Filter out common strings like 'drive_google_com' if they somehow matched (unlikely with -)
+                 if (rawMatch && rawMatch[0].length > 20) {
+                     id = rawMatch[0];
+                 }
+            }
+        }
+
+        if (id) {
+             // Use Google Drive Thumbnail endpoint.
+             // It is much more reliable for <img> tags than 'uc?export=view' and avoids 403 errors.
+             // sz=w400 requests a width of ~400px.
+             return `https://drive.google.com/thumbnail?id=${id}&sz=w400`;
         }
     }
     
@@ -165,13 +187,15 @@ interface CardProps {
 
 const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => {
   const [imgError, setImgError] = useState(false);
-
-  // Reset error state if the image URL changes (e.g. after an edit)
-  useEffect(() => {
-    setImgError(false);
-  }, [item.coverImage]);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const displayUrl = getCoverUrl(item.coverImage);
+
+  // Reset states if URL changes
+  useEffect(() => {
+    setImgError(false);
+    setIsLoaded(false);
+  }, [displayUrl]);
 
   return (
     <div className="group relative bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col h-full overflow-hidden">
@@ -254,8 +278,8 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
           <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col">
              <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
                 
-                {/* Fallback Icon Layer (Visible if imgError is true OR image is loading) */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0">
+                {/* Fallback Icon Layer (Visible until loaded or if error) */}
+                <div className={`absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0 transition-opacity duration-300 ${isLoaded && !imgError ? 'opacity-0' : 'opacity-100'}`}>
                     {imgError ? (
                          <ImageOff size={20} className="text-slate-300" />
                     ) : (
@@ -263,19 +287,20 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                     )}
                 </div>
                 
-                {/* The Image - Only render if no error */}
-                {!imgError && (
-                    <img 
-                        src={displayUrl} 
-                        alt={item.title} 
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
-                        onError={(e) => {
-                            setImgError(true);
-                        }}
-                    />
-                )}
+                {/* The Image - Opacity transition for smooth load */}
+                <img 
+                    src={displayUrl} 
+                    alt={item.title} 
+                    // No loading="lazy" to avoid some edge-case lazy load bugs with dynamic lists
+                    referrerPolicy="no-referrer"
+                    className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-105 relative z-10 ${isLoaded && !imgError ? 'opacity-100' : 'opacity-0'}`}
+                    onLoad={() => setIsLoaded(true)}
+                    onError={(e) => {
+                        console.warn("Cover image failed to load:", displayUrl);
+                        setImgError(true);
+                        setIsLoaded(true); // Stop loading state
+                    }}
+                />
              </div>
           </div>
         )}
