@@ -22,6 +22,7 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
     try {
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
+            // Use standard text/plain to avoid complex CORS preflights
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ 
                 action: 'upload_chunk', 
@@ -42,17 +43,17 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
     } catch (err: any) {
         const errStr = (err.message || err.toString()).toLowerCase().replace(/\s+/g, ' '); // Normalize spaces
         
-        // Detect Permission Error inside a chunk
+        // Detect Permission Error or unrecoverable Network Error
         if (errStr.includes("autorizzazione") || errStr.includes("driveapp") || errStr.includes("permission")) {
-             throw err; // Stop retrying immediately if it's a permission error
+             throw err; 
         }
 
         if (retries > 0) {
-            console.warn(`Chunk ${chunkIndex} failed. Retrying in 1.5s... (${retries} attempts left)`);
-            await delay(1500); // Wait 1.5s before retrying
+            console.warn(`Chunk ${chunkIndex} failed. Retrying in 2s... (${retries} attempts left)`);
+            await delay(2000); // Increased wait time for retries
             return uploadChunkWithRetry(uploadId, chunkIndex, chunkData, retries - 1);
         } else {
-            throw err; // Out of retries, fail for real
+            throw err; 
         }
     }
 };
@@ -107,19 +108,24 @@ export const addResource = async (
   try {
     // CHUNKING LOGIC FOR FILES
     if (resource.fileData && resource.fileData.length > 100 * 1024) {
-        const CHUNK_SIZE = 256 * 1024; 
+        // INCREASED CHUNK SIZE to 2MB to reduce request count and avoid "NetworkError" on large files
+        const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
         const totalSize = resource.fileData.length;
         const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
         const uploadId = `${tempId}_${Date.now()}`; 
 
-        console.log(`Starting chunked upload: ${totalChunks} chunks`);
+        console.log(`Starting chunked upload: ${totalChunks} chunks (Size: ${totalSize})`);
 
         for (let i = 0; i < totalChunks; i++) {
             const start = i * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, totalSize);
             const chunk = resource.fileData.substring(start, end);
+            
             await uploadChunkWithRetry(uploadId, i, chunk);
-            await delay(300);
+            
+            // Increased delay to allow server to breathe and avoid browser socket exhaustion
+            await delay(600); 
+            
             const progress = Math.round(((i + 1) / totalChunks) * 100);
             if (onProgress) onProgress(progress);
         }
@@ -166,12 +172,16 @@ export const addResource = async (
 
   } catch (error: any) {
     console.error("Add failed:", error);
-    const errorStr = (error.message || error.toString()).toLowerCase().replace(/\s+/g, ' ');
-    if (errorStr.includes("autorizzazione") || errorStr.includes("driveapp") || errorStr.includes("permission")) {
+    const errorStr = (error.message || error.toString()).toLowerCase();
+    
+    if (errorStr.includes("autorizzazione") || errorStr.includes("driveapp")) {
         alert("Errore Permessi Google Drive. Esegui _FORCE_AUTH nello script.");
+    } else if (errorStr.includes("networkerror") || errorStr.includes("failed to fetch")) {
+        alert("Errore di rete durante il caricamento. La connessione potrebbe essere instabile o il file troppo grande per la velocità attuale. Riprova.");
     } else {
         alert(`Errore caricamento: ${error.message || error}.`);
     }
+    
     inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
     throw error;
   }
