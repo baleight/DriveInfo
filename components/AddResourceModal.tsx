@@ -488,11 +488,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {formData.type === 'note' ? (
                   <div>
-                      <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-1.5">Anno Accademico</label>
+                      <label className="block text-xs uppercase tracking-wider text-slate-500 font-bold mb-1.5">Note</label>
                       <input 
                       type="text" 
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                      placeholder="es. 23/24"
+                      placeholder="Info aggiuntive..."
                       value={formData.year}
                       onChange={(e) => setFormData({...formData, year: e.target.value})}
                       />

@@ -1,13 +1,24 @@
 
 // ISTRUZIONI:
 // 1. Incolla questo codice in Code.gs.
-// 2. Seleziona '_FORCE_AUTH' ed esegui. Accetta i permessi.
+// 2. Seleziona '_FORCE_AUTH' ed esegui. Accetta i permessi (anche se li hai già dati, potrebbe chiederne di nuovi per lo storage).
 // 3. Fai il Deploy come "Me" e "Chiunque".
 
 function _FORCE_AUTH() {
   const doc = SpreadsheetApp.getActiveSpreadsheet();
   console.log("Sheet permission: OK");
+  
+  // FORCE Scope for Storage: Calling this ensures the OAuth scope is requested
+  try {
+    const used = DriveApp.getStorageUsed();
+    console.log("Storage Scope OK. Current usage: " + used);
+  } catch(e) {
+    console.error("Storage Scope Check Failed: " + e);
+  }
+
   const folders = DriveApp.getFoldersByName("Materiale_Informatica_Uploads"); // Force Drive Scope
+  
+  // Create temp file to ensure Write permissions
   const tempFile = DriveApp.createFile("temp_auth_check.txt", "Auth Check");
   tempFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   tempFile.setTrashed(true);
@@ -28,21 +39,23 @@ function setupSheet() {
 }
 
 function getStorageInfo() {
-  // FIXED LIMIT: 15 GB (in bytes)
-  const LIMIT = 15 * 1024 * 1024 * 1024; // 15 GB
+  // FIXED LIMIT: 15 GB (in bytes) - This is the standard free tier limit
+  const LIMIT = 15 * 1024 * 1024 * 1024; 
   
   let used = 0;
   
+  // Attempt 1: Get Global Drive Usage
+  // This is the most accurate for quota limits (15GB is shared across Gmail/Photos/Drive)
   try {
-    // Attempt 1: Get Global Drive Usage
     used = DriveApp.getStorageUsed();
   } catch (e) {
     console.log("Error fetching global storage: " + e.toString());
   }
 
-  // Attempt 2: If used is 0 (which is suspicious if files exist) or failed, 
-  // calculate the size of the specific Upload Folder manually.
-  // This ensures the user sees at least the space used by THIS app.
+  // Attempt 2: Fallback to Folder Calculation
+  // If global usage returns 0 (suspicious if files exist) or failed, 
+  // we manually calculate the size of the App's Upload Folder.
+  // This ensures the user sees at least the size of the shared archive.
   if (!used || used === 0) {
     try {
       const folders = DriveApp.getFoldersByName("Materiale_Informatica_Uploads");
@@ -87,6 +100,7 @@ function handleRequest(e) {
           if (!obj.id) obj.id = "row_" + (index + 2); else obj.id = obj.id.toString();
           if (!obj.type) obj.type = 'note';
           
+          // Legacy check for Drive links (frontend now handles this too, but good to keep)
           if (obj.coverimage && obj.coverimage.startsWith('http') && obj.coverimage.includes('drive.google.com') && !obj.coverimage.includes('export=view')) {
               const idMatch = obj.coverimage.match(/([a-zA-Z0-9_-]{33,})/);
               if (idMatch) obj.coverimage = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
@@ -182,11 +196,19 @@ function handleRequest(e) {
                  let cov = data.coverImage;
                  if (cov === undefined) cov = vals[10];
                  else if (cov.length > 49000) cov = processFile(cov, data.id+"_cov.jpg", uploadFolder);
+
+                 // Update Icon logic
+                 let icon = data.icon;
+                 if (icon === undefined) icon = vals[9];
+                 else if (icon && icon.length > 1000 && icon.startsWith('data:')) {
+                     icon = processFile(icon, data.id+"_icon.png", uploadFolder);
+                 }
                  
-                 range.setValues([[vals[0], data.title, data.url||vals[2], data.description, data.year, vals[5], data.category, data.categoryColor, data.type, vals[9], cov]]);
+                 range.setValues([[vals[0], data.title, data.url||vals[2], data.description, data.year, vals[5], data.category, data.categoryColor, data.type, icon, cov]]);
+                 
                  return responseJSON({ 
                      status: 'success', 
-                     data: {...data, coverImage: cov},
+                     data: {...data, coverImage: cov, icon: icon},
                      storage: getStorageInfo()
                  });
              }
