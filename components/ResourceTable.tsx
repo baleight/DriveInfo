@@ -12,6 +12,29 @@ interface ResourceGridProps {
   onDelete: (id: string) => void;
 }
 
+// Helper to ensure Google Drive images render correctly
+const getCoverUrl = (url: string | undefined) => {
+    if (!url) return '';
+    
+    // 1. If Base64, return as is
+    if (url.startsWith('data:')) return url;
+    
+    // 2. If Google Drive URL, normalize to export=view format
+    if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
+        // Already in correct format?
+        if (url.includes('export=view')) return url;
+
+        // Try to extract ID
+        const idMatch = url.match(/[-\w]{25,}/);
+        if (idMatch) {
+             return `https://drive.google.com/uc?export=view&id=${idMatch[0]}`;
+        }
+    }
+    
+    // 3. Return original for others
+    return url;
+};
+
 export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type, onEdit, onDelete }) => {
   if (items.length === 0) return null;
 
@@ -98,7 +121,7 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
 
       {/* Actions (Hover only) */}
       <div className="absolute top-2 right-2 z-10 flex flex-col items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 backdrop-blur-sm rounded-md shadow-sm border border-slate-100 p-0.5 pointer-events-auto">
-        {/* Redirection Button (ex-Download) */}
+        {/* Redirection Button */}
         <a 
             href={item.url} 
             target="_blank" 
@@ -147,6 +170,8 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
   useEffect(() => {
     setImgError(false);
   }, [item.coverImage]);
+
+  const displayUrl = getCoverUrl(item.coverImage);
 
   return (
     <div className="group relative bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col h-full overflow-hidden">
@@ -225,7 +250,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
         </div>
 
         {/* Right Column: Cover Image (Fixed Width) */}
-        {type === 'book' && item.coverImage && (
+        {type === 'book' && displayUrl && (
           <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col">
              <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
                 
@@ -241,13 +266,12 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
                 {/* The Image - Only render if no error */}
                 {!imgError && (
                     <img 
-                        src={item.coverImage} 
+                        src={displayUrl} 
                         alt={item.title} 
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
                         onError={(e) => {
-                            // Instead of hiding via style, we update state to show the fallback
                             setImgError(true);
                         }}
                     />
