@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResourceItem } from '../types';
 import { Badge } from './Badge';
-import { FileText, BookOpen, Download, Pencil, Trash2, User, Calendar } from 'lucide-react';
+import { FileText, BookOpen, Download, Pencil, Trash2, User, Calendar, ImageOff } from 'lucide-react';
 
 interface ResourceGridProps {
   title: string;
@@ -143,6 +143,13 @@ interface CardProps {
 }
 
 const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => {
+  const [imgError, setImgError] = useState(false);
+
+  // Reset error state if the image URL changes (e.g. after an edit)
+  useEffect(() => {
+    setImgError(false);
+  }, [item.coverImage]);
+
   return (
     <div className="group relative bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col h-full overflow-hidden">
       
@@ -223,22 +230,30 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
         {type === 'book' && item.coverImage && (
           <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col">
              <div className="aspect-[2/3] w-full rounded-md overflow-hidden shadow-sm border border-slate-200 relative bg-slate-100 flex items-center justify-center group/cover">
-                {/* Fallback Icon */}
+                
+                {/* Fallback Icon Layer (Visible if imgError is true OR image is loading) */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 z-0">
-                    <BookOpen size={20} />
+                    {imgError ? (
+                         <ImageOff size={20} className="text-slate-300" />
+                    ) : (
+                         <BookOpen size={20} />
+                    )}
                 </div>
                 
-                {/* The Image - Object Cover to fill the box without whitespace */}
-                <img 
-                    src={item.coverImage} 
-                    alt={item.title} 
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
-                    onError={(e) => {
-                        e.currentTarget.style.display = 'none'; 
-                    }}
-                />
+                {/* The Image - Only render if no error */}
+                {!imgError && (
+                    <img 
+                        src={item.coverImage} 
+                        alt={item.title} 
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
+                        onError={(e) => {
+                            // Instead of hiding via style, we update state to show the fallback
+                            setImgError(true);
+                        }}
+                    />
+                )}
              </div>
           </div>
         )}
