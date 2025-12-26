@@ -1,3 +1,4 @@
+
 export enum ResourceCategory {
   GENERAL = 'Generale',
   CALCULUS = 'Calcolo numerico',
@@ -35,4 +36,14 @@ export interface ResourceItem {
   type: 'note' | 'book';
   icon?: string; // URL or emoji
   coverImage?: string; // For books
+}
+
+export interface StorageInfo {
+  used: number;  // Bytes
+  limit: number; // Bytes
+}
+
+export interface ApiResponse {
+  resources: ResourceItem[];
+  storage?: StorageInfo;
 }

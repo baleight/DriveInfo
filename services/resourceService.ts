@@ -1,5 +1,6 @@
+
 import { INITIAL_RESOURCES, GOOGLE_APPS_SCRIPT_URL } from '../constants';
-import { ResourceItem } from '../types';
+import { ResourceItem, StorageInfo, ApiResponse } from '../types';
 
 // In-memory fallback if API is not configured
 let inMemoryDb: ResourceItem[] = [...INITIAL_RESOURCES];
@@ -55,75 +56,72 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
     }
 };
 
-export const getResources = async (): Promise<ResourceItem[]> => {
+// Modified to return object with data AND storage info
+export const getResources = async (): Promise<ApiResponse> => {
   if (!GOOGLE_APPS_SCRIPT_URL) {
     console.warn("GOOGLE_APPS_SCRIPT_URL is not set. Using mock data.");
-    return new Promise((resolve) => setTimeout(() => resolve([...inMemoryDb]), 300));
+    return new Promise((resolve) => setTimeout(() => resolve({ resources: [...inMemoryDb] }), 300));
   }
 
   try {
     const response = await fetch(GOOGLE_APPS_SCRIPT_URL);
     if (!response.ok) throw new Error('Network response was not ok');
-    const data = await response.json();
+    const json = await response.json();
     
-    if (Array.isArray(data) && data.length > 0) {
-        return data;
-    } else {
-        return [...INITIAL_RESOURCES];
+    // Handle new format { status: 'success', data: [], storage: {} }
+    if (json.status === 'success') {
+        return {
+            resources: json.data || [],
+            storage: json.storage
+        };
+    } 
+    // Fallback for legacy format (direct array)
+    else if (Array.isArray(json)) {
+        return { resources: json };
     }
+    
+    return { resources: [...INITIAL_RESOURCES] };
+
   } catch (error) {
     console.error("Failed to fetch resources:", error);
-    return [...inMemoryDb];
+    return { resources: [...inMemoryDb] };
   }
 };
 
 export const addResource = async (
     resource: Omit<ResourceItem, 'id'> & { fileData?: string }, 
     onProgress?: (percentage: number) => void
-): Promise<ResourceItem> => {
+): Promise<{ item: ResourceItem, storage?: StorageInfo }> => {
   const tempId = Math.random().toString(36).substr(2, 9);
   
   // Optimistic UI update
   const newResourceLocal = { ...resource, id: tempId };
   inMemoryDb = [newResourceLocal as ResourceItem, ...inMemoryDb];
 
-  if (!checkApiConfigured()) return newResourceLocal as ResourceItem;
+  if (!checkApiConfigured()) return { item: newResourceLocal as ResourceItem };
 
   try {
     // CHUNKING LOGIC FOR FILES
-    // Threshold set low to ensure stability
     if (resource.fileData && resource.fileData.length > 100 * 1024) {
-        // 256KB chunks are extremely safe for GAS.
         const CHUNK_SIZE = 256 * 1024; 
         const totalSize = resource.fileData.length;
         const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
         const uploadId = `${tempId}_${Date.now()}`; 
 
-        console.log(`Starting chunked upload: ${totalChunks} chunks for ${totalSize} bytes`);
+        console.log(`Starting chunked upload: ${totalChunks} chunks`);
 
-        // Upload chunks sequentially
         for (let i = 0; i < totalChunks; i++) {
             const start = i * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, totalSize);
             const chunk = resource.fileData.substring(start, end);
-            
-            // Upload with retry mechanism
             await uploadChunkWithRetry(uploadId, i, chunk);
-            
-            // Throttle: Add a small delay between chunks to prevent "Too Many Requests" from Google
             await delay(300);
-            
-            // Calculate and report progress
             const progress = Math.round(((i + 1) / totalChunks) * 100);
             if (onProgress) onProgress(progress);
-            
-            console.log(`Uploaded chunk ${i + 1}/${totalChunks} (${progress}%)`);
         }
 
-        // Finalize creation
+        // Finalize
         const resourceWithoutFile = { ...resource, fileData: '' }; 
-        
-        // Final call needs retry logic too, just in case
         const finalizeResponse = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
             headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -136,17 +134,16 @@ export const addResource = async (
         });
 
         const result = await finalizeResponse.json();
-        
         if (result.status === 'success') {
             const serverItem = result.data as ResourceItem;
             inMemoryDb = inMemoryDb.map(item => item.id === tempId ? serverItem : item);
-            return serverItem;
+            return { item: serverItem, storage: result.storage };
         } else {
              throw new Error(result.message || 'Unknown error');
         }
 
     } else {
-        // STANDARD UPLOAD (Very small files only)
+        // STANDARD UPLOAD
         if (onProgress) onProgress(10); 
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
@@ -157,7 +154,7 @@ export const addResource = async (
         const result = await response.json();
         
         if (result.status === 'success') {
-             return result.data;
+             return { item: result.data, storage: result.storage };
         } else {
              throw new Error(result.message);
         }
@@ -165,37 +162,20 @@ export const addResource = async (
 
   } catch (error: any) {
     console.error("Add failed:", error);
-    
-    // Custom error message for Permission Issues
     const errorStr = (error.message || error.toString()).toLowerCase().replace(/\s+/g, ' ');
-    
     if (errorStr.includes("autorizzazione") || errorStr.includes("driveapp") || errorStr.includes("permission")) {
-        alert(
-`⚠️ ERRORE PERMESSI GOOGLE DRIVE ⚠️
-
-Lo script backend non ha l'autorizzazione per creare file.
-
-SOLUZIONE:
-1. Vai nell'editor di Google Apps Script.
-2. Esegui la funzione '_FORCE_AUTH' e accetta i permessi (anche quelli "non sicuri").
-3. IMPORTANTE: Fai "Nuova distribuzione".
-4. Imposta "Esegui come" su "Me" (la tua email), NON "Utente che accede".
-5. Copia il nuovo URL.`
-        );
+        alert("Errore Permessi Google Drive. Esegui _FORCE_AUTH nello script.");
     } else {
-        alert(`Errore durante il caricamento: ${error.message || error}. Riprova, magari con un file più piccolo o controlla la connessione.`);
+        alert(`Errore caricamento: ${error.message || error}.`);
     }
-
-    // Remove the optimistic item if it failed
     inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
     throw error;
   }
 };
 
-export const updateResource = async (resource: ResourceItem): Promise<ResourceItem> => {
+export const updateResource = async (resource: ResourceItem): Promise<{ item: ResourceItem, storage?: StorageInfo }> => {
   inMemoryDb = inMemoryDb.map(r => r.id === resource.id ? resource : r);
-
-  if (!checkApiConfigured()) return resource;
+  if (!checkApiConfigured()) return { item: resource };
 
   try {
     const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
@@ -204,18 +184,16 @@ export const updateResource = async (resource: ResourceItem): Promise<ResourceIt
       body: JSON.stringify({ action: 'edit', ...resource }),
     });
     const result = await response.json();
-    return result.status === 'success' ? result.data : resource;
+    return result.status === 'success' ? { item: result.data, storage: result.storage } : { item: resource };
   } catch (error) {
     console.error("Update failed:", error);
-    alert("Errore durante l'aggiornamento.");
-    return resource;
+    return { item: resource };
   }
 };
 
-export const deleteResource = async (id: string): Promise<boolean> => {
+export const deleteResource = async (id: string): Promise<{ success: boolean, storage?: StorageInfo }> => {
   inMemoryDb = inMemoryDb.filter(r => r.id !== id);
-
-  if (!checkApiConfigured()) return true;
+  if (!checkApiConfigured()) return { success: true };
 
   try {
     const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
@@ -224,10 +202,9 @@ export const deleteResource = async (id: string): Promise<boolean> => {
       body: JSON.stringify({ action: 'delete', id }),
     });
     const result = await response.json();
-    return result.status === 'success';
+    return { success: result.status === 'success', storage: result.storage };
   } catch (error) {
     console.error("Delete failed:", error);
-    alert("Errore durante l'eliminazione.");
-    return false;
+    return { success: false };
   }
 };

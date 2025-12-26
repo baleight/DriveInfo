@@ -1,13 +1,15 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
-import { ResourceItem } from './types';
+import { ResourceItem, StorageInfo } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
 import { Plus, Search, Loader2, X, Github, Mail } from 'lucide-react';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ResourceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,8 +20,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-          const data = await getResources();
-          setResources(data);
+          const result = await getResources();
+          setResources(result.resources);
+          if (result.storage) setStorage(result.storage);
       } catch (e) {
           console.error("Error loading resources", e);
       } finally {
@@ -37,12 +40,13 @@ const App: React.FC = () => {
         // UPDATE MODE
         const updatedResource = { ...formData, id: editingItem.id } as ResourceItem;
         setResources(prev => prev.map(r => r.id === editingItem.id ? updatedResource : r));
-        await updateResource(updatedResource);
+        const result = await updateResource(updatedResource);
+        if (result.storage) setStorage(result.storage);
     } else {
         // CREATE MODE
-        // We pass the onProgress callback down to the service
-        const addedItem = await addResource(formData, onProgress);
-        setResources(prev => [addedItem, ...prev]);
+        const result = await addResource(formData, onProgress);
+        setResources(prev => [result.item, ...prev]);
+        if (result.storage) setStorage(result.storage);
     }
     setEditingItem(null);
   };
@@ -54,7 +58,8 @@ const App: React.FC = () => {
 
   const handleDeleteClick = async (id: string) => {
       setResources(prev => prev.filter(r => r.id !== id)); // Optimistic delete
-      await deleteResource(id);
+      const result = await deleteResource(id);
+      if (result.storage) setStorage(result.storage);
   };
 
   const handleModalClose = () => {
@@ -90,18 +95,16 @@ const App: React.FC = () => {
     return result;
   }, [resources, searchTerm, selectedCategory]);
 
-  // Robust splitting: If it's explicitly a book, it goes to books. Everything else goes to notes.
-  // This ensures items with missing or malformed 'type' fields still appear in the main list.
   const books = filteredResources.filter(r => r.type === 'book');
   const notes = filteredResources.filter(r => r.type !== 'book');
 
   return (
     <div className="min-h-screen selection:bg-blue-100 selection:text-blue-900 flex flex-col">
-      <Header />
+      <Header storage={storage} />
 
       <main className="w-full px-6 lg:px-12 flex-1 pb-12">
         
-        {/* Search & Filter Section - Kept centered for UX but slightly wider */}
+        {/* Search & Filter Section */}
         <div className="max-w-5xl mx-auto mb-12">
             
             {/* Search Bar */}

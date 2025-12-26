@@ -1,3 +1,4 @@
+
 // ISTRUZIONI:
 // 1. Incolla questo codice in Code.gs.
 // 2. Seleziona '_FORCE_AUTH' ed esegui. Accetta i permessi.
@@ -26,6 +27,17 @@ function setupSheet() {
   }
 }
 
+function getStorageInfo() {
+  try {
+    return {
+      used: DriveApp.getStorageUsed(),
+      limit: DriveApp.getStorageLimit()
+    };
+  } catch (e) {
+    return { used: 0, limit: 0, error: e.toString() };
+  }
+}
+
 function doGet(e) { return handleRequest(e); }
 function doPost(e) { return handleRequest(e); }
 
@@ -38,29 +50,36 @@ function handleRequest(e) {
     // READ (GET)
     if (!e.postData || !e.postData.contents) {
       const rows = sheet.getDataRange().getValues();
-      if (rows.length === 0) return responseJSON([]);
-      const rawHeaders = rows.shift();
-      const headers = rawHeaders.map(h => h.toString().toLowerCase().trim());
-      const result = rows.map((row, index) => {
-        let obj = {};
-        headers.forEach((header, colIndex) => { obj[header] = (row[colIndex] !== undefined) ? row[colIndex] : ""; });
-        if (!obj.id) obj.id = "row_" + (index + 2); else obj.id = obj.id.toString();
-        if (!obj.type) obj.type = 'note';
-        
-        // Fix legacy drive images if any exist
-        if (obj.coverimage && obj.coverimage.startsWith('http') && obj.coverimage.includes('drive.google.com') && !obj.coverimage.includes('export=view')) {
-            const idMatch = obj.coverimage.match(/([a-zA-Z0-9_-]{33,})/);
-            if (idMatch) obj.coverimage = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
-        }
-        
-        return {
-            id: obj.id, title: obj.title, url: obj.url, description: obj.description,
-            year: obj.year, dateAdded: obj.dateadded, category: obj.category,
-            categoryColor: obj.categorycolor || "gray", type: obj.type,
-            icon: obj.icon, coverImage: obj.coverimage
-        };
-      }).filter(i => i.title);
-      return responseJSON(result);
+      let data = [];
+      
+      if (rows.length > 0) {
+        const rawHeaders = rows.shift();
+        const headers = rawHeaders.map(h => h.toString().toLowerCase().trim());
+        data = rows.map((row, index) => {
+          let obj = {};
+          headers.forEach((header, colIndex) => { obj[header] = (row[colIndex] !== undefined) ? row[colIndex] : ""; });
+          if (!obj.id) obj.id = "row_" + (index + 2); else obj.id = obj.id.toString();
+          if (!obj.type) obj.type = 'note';
+          
+          if (obj.coverimage && obj.coverimage.startsWith('http') && obj.coverimage.includes('drive.google.com') && !obj.coverimage.includes('export=view')) {
+              const idMatch = obj.coverimage.match(/([a-zA-Z0-9_-]{33,})/);
+              if (idMatch) obj.coverimage = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+          }
+          
+          return {
+              id: obj.id, title: obj.title, url: obj.url, description: obj.description,
+              year: obj.year, dateAdded: obj.dateadded, category: obj.category,
+              categoryColor: obj.categorycolor || "gray", type: obj.type,
+              icon: obj.icon, coverImage: obj.coverimage
+          };
+        }).filter(i => i.title);
+      }
+      
+      return responseJSON({
+        status: 'success',
+        data: data,
+        storage: getStorageInfo()
+      });
     }
 
     // WRITE (POST)
@@ -84,9 +103,7 @@ function handleRequest(e) {
             const id = Math.random().toString(36).substr(2, 9);
             const finalIcon = data.icon ? processFile(data.icon, id+"_icon.png", uploadFolder) : "";
             
-            // COVER IMAGE: We now prefer the direct base64 string because frontend compresses it
             let finalCover = data.coverImage || "";
-            // Only upload to drive if it's somehow massive (fallback), otherwise keep raw string
             if (finalCover.length > 49000) {
                  finalCover = processFile(finalCover, id+"_cover.jpg", uploadFolder);
             }
@@ -94,7 +111,6 @@ function handleRequest(e) {
             let resUrl = data.url || '';
             if (data.fileData && data.fileData.length > 50) resUrl = processFile(data.fileData, id+"_file.pdf", uploadFolder);
             else if (data.uploadId) {
-                 // Reassemble chunks
                  let full = "";
                  for(let i=0; i<data.totalChunks; i++) {
                      const f = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`).next();
@@ -105,12 +121,30 @@ function handleRequest(e) {
             }
 
             sheet.appendRow([id, data.title, resUrl, data.description, data.year, new Date().toLocaleDateString('en-GB'), data.category, data.categoryColor, (data.type||'note'), finalIcon, finalCover]);
-            return responseJSON({ status: 'success', data: { ...data, id, url: resUrl, coverImage: finalCover } });
+            return responseJSON({ 
+                status: 'success', 
+                data: { ...data, id, url: resUrl, coverImage: finalCover },
+                storage: getStorageInfo() 
+            });
         }
         
         if (action === 'delete') {
              const idx = findRowIndexById(sheet, data.id);
-             if (idx > 0) { sheet.deleteRow(idx); return responseJSON({ status: 'success' }); }
+             if (idx > 0) { 
+                 // Try to delete file from Drive if it's hosted there to free up space
+                 const range = sheet.getRange(idx, 1, 1, 11);
+                 const vals = range.getValues()[0];
+                 const url = vals[2]; // url column
+                 if (url && url.includes('drive.google.com')) {
+                    try {
+                        const idMatch = url.match(/id=([a-zA-Z0-9_-]+)/);
+                        if (idMatch) DriveApp.getFileById(idMatch[1]).setTrashed(true);
+                    } catch(e) {}
+                 }
+
+                 sheet.deleteRow(idx); 
+                 return responseJSON({ status: 'success', storage: getStorageInfo() }); 
+             }
         }
 
         if (action === 'edit') {
@@ -120,12 +154,15 @@ function handleRequest(e) {
                  const vals = range.getValues()[0];
                  
                  let cov = data.coverImage;
-                 // If undefined, keep old. If empty string, clear it. If string, update.
                  if (cov === undefined) cov = vals[10];
                  else if (cov.length > 49000) cov = processFile(cov, data.id+"_cov.jpg", uploadFolder);
                  
                  range.setValues([[vals[0], data.title, data.url||vals[2], data.description, data.year, vals[5], data.category, data.categoryColor, data.type, vals[9], cov]]);
-                 return responseJSON({ status: 'success', data: {...data, coverImage: cov} });
+                 return responseJSON({ 
+                     status: 'success', 
+                     data: {...data, coverImage: cov},
+                     storage: getStorageInfo()
+                 });
              }
         }
 
