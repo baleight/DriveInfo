@@ -280,7 +280,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 required
                 type="text" 
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                placeholder={formData.type === 'note' ? "Es. Appunti Fisica Singh" : "Es. Computer Organization"}
+                placeholder={formData.type === 'note' ? "Es. Appunti Fisica" : "Es. Computer Organization"}
                 value={formData.title}
                 onChange={(e) => setFormData({...formData, title: e.target.value})}
               />
