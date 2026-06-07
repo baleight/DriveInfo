@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResourceItem } from '../types';
 import { Badge } from './Badge';
-import { FileText, BookOpen, Download, Pencil, Trash2, User, ImageOff, ExternalLink, Search, X } from 'lucide-react';
+import { FileText, BookOpen, Download, Pencil, Trash2, User, ImageOff, ExternalLink } from 'lucide-react';
 import { splitCategories } from '../utils/categories';
 
 interface ResourceGridProps {
@@ -36,39 +36,6 @@ const getCoverUrl = (url: string | undefined) => {
 };
 
 export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type, onEdit, onDelete }) => {
-  const [tableSearch, setTableSearch] = useState('');
-  const [tableCategory, setTableCategory] = useState('');
-  const [tableYear, setTableYear] = useState('');
-
-  const noteCategories = useMemo(() => {
-    const categories = new Set(items.flatMap(item => splitCategories(item.category)));
-    return Array.from(categories).sort();
-  }, [items]);
-
-  const noteYears = useMemo(() => {
-    const years = new Set(items.map(item => item.year).filter((year): year is string => Boolean(year)));
-    return Array.from(years).sort((a, b) => b.localeCompare(a));
-  }, [items]);
-
-  const visibleItems = useMemo(() => {
-    if (type !== 'note') return items;
-
-    const search = tableSearch.trim().toLowerCase();
-    return items.filter(item => {
-      const matchesSearch = !search ||
-        item.title.toLowerCase().includes(search) ||
-        item.category.toLowerCase().includes(search) ||
-        (item.description && item.description.toLowerCase().includes(search)) ||
-        (item.year && item.year.toLowerCase().includes(search));
-      const matchesCategory = !tableCategory || splitCategories(item.category).includes(tableCategory);
-      const matchesYear = !tableYear || item.year === tableYear;
-
-      return matchesSearch && matchesCategory && matchesYear;
-    });
-  }, [items, tableSearch, tableCategory, tableYear, type]);
-
-  const hasTableFilters = tableSearch || tableCategory || tableYear;
-
   if (items.length === 0) return null;
 
   return (
@@ -83,88 +50,21 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
           {title}
         </h3>
         <span className="bg-brut-accent text-brut-text font-mono text-xs font-bold px-2 py-0.5 border border-brut-border">
-          {type === 'note' && hasTableFilters ? `${visibleItems.length}/${items.length}` : items.length}
+          {items.length}
         </span>
       </div>
 
       {type === 'note' ? (
         // LIST VIEW — dense rows
-        <div className="border-2 border-brut-border bg-white shadow-brut">
-          <div className="grid gap-2 p-3 border-b-2 border-brut-border bg-brut-bg md:grid-cols-[minmax(0,1fr)_180px_130px_auto]">
-            <div className="relative min-w-0">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
-                <Search size={15} strokeWidth={2.5} />
-              </div>
-              <input
-                type="text"
-                className="block w-full h-10 pl-9 pr-9 bg-white border-2 border-brut-border text-sm text-brut-text placeholder-brut-muted font-medium focus:outline-none focus:border-brut-accent"
-                placeholder="Filtra appunti..."
-                value={tableSearch}
-                onChange={(event) => setTableSearch(event.target.value)}
-              />
-              {tableSearch && (
-                <button
-                  onClick={() => setTableSearch('')}
-                  className="absolute inset-y-0 right-3 flex items-center text-brut-muted hover:text-brut-text"
-                  title="Cancella ricerca"
-                >
-                  <X size={14} strokeWidth={2.5} />
-                </button>
-              )}
-            </div>
-
-            <select
-              value={tableCategory}
-              onChange={(event) => setTableCategory(event.target.value)}
-              className="h-10 bg-white border-2 border-brut-border px-3 text-xs font-bold uppercase text-brut-text focus:outline-none focus:border-brut-accent"
-            >
-              <option value="">Tutte le categorie</option>
-              {noteCategories.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-
-            <select
-              value={tableYear}
-              onChange={(event) => setTableYear(event.target.value)}
-              className="h-10 bg-white border-2 border-brut-border px-3 text-xs font-bold uppercase text-brut-text focus:outline-none focus:border-brut-accent"
-            >
-              <option value="">Tutti gli anni</option>
-              {noteYears.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => {
-                setTableSearch('');
-                setTableCategory('');
-                setTableYear('');
-              }}
-              disabled={!hasTableFilters}
-              className="h-10 px-3 border-2 border-brut-border bg-white text-xs font-black uppercase tracking-wider text-brut-text hover:bg-brut-accent disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed"
-            >
-              Reset
-            </button>
-          </div>
-
-          {visibleItems.length > 0 ? (
-            <div className="divide-y divide-brut-line">
-              {visibleItems.map((item) => (
-                <ResourceRow
-                  key={item.id}
-                  item={item}
-                  onEdit={() => onEdit(item)}
-                  onDelete={() => onDelete(item.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 py-10 text-center">
-              <p className="text-sm font-black text-brut-text uppercase mb-2">Nessun appunto trovato</p>
-              <p className="text-xs font-mono text-brut-muted">Modifica o rimuovi i filtri della tabella.</p>
-            </div>
-          )}
+        <div className="border-2 border-brut-border bg-white shadow-brut divide-y divide-brut-line">
+          {items.map((item) => (
+            <ResourceRow
+              key={item.id}
+              item={item}
+              onEdit={() => onEdit(item)}
+              onDelete={() => onDelete(item.id)}
+            />
+          ))}
         </div>
       ) : (
         // GRID VIEW — brutal cards
