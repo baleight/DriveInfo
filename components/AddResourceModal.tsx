@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ResourceCategory, TagColor, ResourceItem } from '../types';
 import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
+import { joinCategories, splitCategories } from '../utils/categories';
 
 interface AddResourceModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
   const [formData, setFormData] = useState(defaultState);
   const [sourceType, setSourceType] = useState<'url' | 'file'>('url');
+  const [customCategory, setCustomCategory] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -74,9 +76,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 icon: initialData.icon || PRESET_ICONS[0].url
             });
             setSourceType('url');
+            setCustomCategory('');
         } else {
             setFormData(defaultState);
             setSourceType('url');
+            setCustomCategory('');
         }
     }
   }, [isOpen, initialData]);
@@ -154,6 +158,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     setUploadProgress(0);
     if (sourceType === 'url' && !formData.url) { setError("Inserisci un URL valido."); return; }
     if (sourceType === 'file' && !formData.fileData && !isEditMode) { setError("Seleziona un file PDF da caricare."); return; }
+    if (!formData.category.trim()) { setError("Seleziona almeno una materia."); return; }
     setLoading(true);
     const resourceData: any = {
         ...formData,
@@ -172,7 +177,25 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   };
 
   const isEditMode = !!initialData;
-  const isCustomCategory = !Object.values(ResourceCategory).includes(formData.category as ResourceCategory);
+  const isMultiCategoryMode = sourceType === 'url';
+  const selectedCategories = splitCategories(formData.category);
+  const isCustomCategory = !isMultiCategoryMode && !Object.values(ResourceCategory).includes(formData.category as ResourceCategory);
+
+  const toggleCategory = (category: string) => {
+    const nextCategories = selectedCategories.includes(category)
+      ? selectedCategories.filter(item => item !== category)
+      : [...selectedCategories, category];
+
+    setFormData({ ...formData, category: joinCategories(nextCategories) });
+  };
+
+  const addCustomCategory = () => {
+    const nextCategory = customCategory.trim();
+    if (!nextCategory) return;
+
+    setFormData({ ...formData, category: joinCategories([...selectedCategories, nextCategory]) });
+    setCustomCategory('');
+  };
 
   return (
     <div className="fixed inset-0 bg-brut-text/80 z-50 flex items-center justify-center p-4 animate-fade-in">
@@ -263,7 +286,15 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setSourceType('file'); setFormData({...formData, url: ''}); setError(null); }}
+                  onClick={() => {
+                    setSourceType('file');
+                    setFormData({
+                      ...formData,
+                      url: '',
+                      category: splitCategories(formData.category)[0] || ResourceCategory.GENERAL
+                    });
+                    setError(null);
+                  }}
                   className={`px-3 py-1 text-xs font-bold uppercase tracking-wider transition-colors ${sourceType === 'file' ? 'bg-brut-text text-white' : 'bg-white text-brut-muted hover:bg-brut-bg'}`}
                 >
                   File
@@ -366,39 +397,101 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
           {/* Category + Color */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Materia</label>
-              <div className="relative">
-                <select
-                  className={inputClass + ' appearance-none pr-8'}
-                  value={isCustomCategory ? 'CUSTOM' : formData.category}
-                  onChange={(e) => {
-                    if (e.target.value === 'CUSTOM') setFormData({...formData, category: ''});
-                    else setFormData({...formData, category: e.target.value});
-                  }}
-                >
-                  {Object.values(ResourceCategory).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                  <option value="CUSTOM">Altro... (nuova)</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-brut-muted">
-                  <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                </div>
-              </div>
-              {isCustomCategory && (
-                <div className="mt-2 animate-fade-in relative">
-                  <input
-                    autoFocus
-                    type="text"
-                    className={inputClass + ' pl-9 border-brut-accent'}
-                    placeholder="Nome nuova materia..."
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  />
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
-                    <PenTool size={14} />
+              <label className={labelClass}>{isMultiCategoryMode ? 'Materie' : 'Materia'}</label>
+              {isMultiCategoryMode ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {Object.values(ResourceCategory).map(cat => {
+                      const isSelected = selectedCategories.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          className={`inline-flex items-center gap-1.5 border-2 px-2 py-1 text-[10px] font-black uppercase tracking-wider ${
+                            isSelected
+                              ? 'border-brut-border bg-brut-text text-brut-accent shadow-brut'
+                              : 'border-brut-border bg-white text-brut-text hover:bg-brut-accent'
+                          }`}
+                        >
+                          {isSelected && <Check size={12} strokeWidth={3} />}
+                          {cat}
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        className={inputClass + ' pl-9'}
+                        placeholder="Nuova materia..."
+                        value={customCategory}
+                        onChange={(e) => setCustomCategory(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCustomCategory();
+                          }
+                        }}
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
+                        <PenTool size={14} />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addCustomCategory}
+                      className="w-10 border-2 border-brut-border bg-white flex items-center justify-center hover:bg-brut-accent text-brut-text"
+                      title="Aggiungi materia"
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
+
+                  {selectedCategories.length > 0 && (
+                    <p className="font-mono text-[10px] text-brut-muted">
+                      Selezionate: {selectedCategories.join(', ')}
+                    </p>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <select
+                      className={inputClass + ' appearance-none pr-8'}
+                      value={isCustomCategory ? 'CUSTOM' : formData.category}
+                      onChange={(e) => {
+                        if (e.target.value === 'CUSTOM') setFormData({...formData, category: ''});
+                        else setFormData({...formData, category: e.target.value});
+                      }}
+                    >
+                      {Object.values(ResourceCategory).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="CUSTOM">Altro... (nuova)</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-brut-muted">
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    </div>
+                  </div>
+                  {isCustomCategory && (
+                    <div className="mt-2 animate-fade-in relative">
+                      <input
+                        autoFocus
+                        type="text"
+                        className={inputClass + ' pl-9 border-brut-accent'}
+                        placeholder="Nome nuova materia..."
+                        value={formData.category}
+                        onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
+                        <PenTool size={14} />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

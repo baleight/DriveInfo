@@ -6,6 +6,7 @@ import { AddResourceModal } from './components/AddResourceModal';
 import { ResourceItem } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
 import { Plus, Search, Loader2, X, Github, Mail } from 'lucide-react';
+import { splitCategories } from './utils/categories';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
@@ -63,14 +64,14 @@ const App: React.FC = () => {
   };
 
   const availableCategories = useMemo(() => {
-      const cats = new Set(resources.map(r => r.category).filter(c => c && c.trim() !== ''));
+      const cats = new Set(resources.flatMap(r => splitCategories(r.category)));
       return Array.from(cats).sort();
   }, [resources]);
 
   const filteredResources = useMemo(() => {
     let result = resources;
     if (selectedCategory) {
-        result = result.filter(r => r.category === selectedCategory);
+        result = result.filter(r => splitCategories(r.category).includes(selectedCategory));
     }
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
