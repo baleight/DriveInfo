@@ -15,7 +15,6 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Load initial data
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -31,25 +30,17 @@ const App: React.FC = () => {
   }, []);
 
   const handleCreateOrUpdate = async (
-    formData: Omit<ResourceItem, 'id'>, 
+    formData: Omit<ResourceItem, 'id'>,
     onProgress?: (percentage: number) => void
   ) => {
     if (editingItem) {
-        // UPDATE MODE
         const optimisticResource = { ...formData, id: editingItem.id } as ResourceItem;
-        
-        // Optimistic update (shows changes immediately)
         setResources(prev => prev.map(r => r.id === editingItem.id ? optimisticResource : r));
-        
         const result = await updateResource(optimisticResource);
-        
-        // CRITICAL FIX: Update state with actual server response.
-        // This ensures temporary Base64 images are replaced with permanent Drive URLs.
         if (result.item) {
              setResources(prev => prev.map(r => r.id === result.item.id ? result.item : r));
         }
     } else {
-        // CREATE MODE
         const result = await addResource(formData, onProgress);
         setResources(prev => [result.item, ...prev]);
     }
@@ -62,7 +53,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteClick = async (id: string) => {
-      setResources(prev => prev.filter(r => r.id !== id)); // Optimistic delete
+      setResources(prev => prev.filter(r => r.id !== id));
       await deleteResource(id);
   };
 
@@ -71,150 +62,146 @@ const App: React.FC = () => {
       setEditingItem(null);
   };
 
-  // Get unique categories from data
   const availableCategories = useMemo(() => {
       const cats = new Set(resources.map(r => r.category).filter(c => c && c.trim() !== ''));
       return Array.from(cats).sort();
   }, [resources]);
 
-  // Filter Logic
   const filteredResources = useMemo(() => {
     let result = resources;
-
-    // 1. Filter by Category
     if (selectedCategory) {
         result = result.filter(r => r.category === selectedCategory);
     }
-
-    // 2. Filter by Search Term
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
-      result = result.filter(r => 
-        r.title.toLowerCase().includes(lowerTerm) || 
+      result = result.filter(r =>
+        r.title.toLowerCase().includes(lowerTerm) ||
         (r.category && r.category.toLowerCase().includes(lowerTerm)) ||
         (r.description && r.description.toLowerCase().includes(lowerTerm))
       );
     }
-
     return result;
   }, [resources, searchTerm, selectedCategory]);
 
   const books = filteredResources.filter(r => r.type === 'book');
   const notes = filteredResources.filter(r => r.type !== 'book');
 
+  const allNotes = resources.filter(r => r.type !== 'book');
+  const allBooks = resources.filter(r => r.type === 'book');
+
   return (
-    <div className="min-h-screen selection:bg-blue-100 selection:text-blue-900 flex flex-col">
-      <Header />
+    <div className="min-h-screen flex flex-col bg-brut-bg">
+      <Header noteCount={allNotes.length} bookCount={allBooks.length} />
 
-      <main className="w-full px-6 lg:px-12 flex-1 pb-12">
-        
-        {/* Search & Filter Section */}
-        <div className="max-w-5xl mx-auto mb-12">
-            
-            {/* Search Bar */}
-            <div className="relative group mb-6">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                    <Search size={20} />
-                </div>
-                <input
-                    type="text"
-                    className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
-                    placeholder="Cerca appunti, libri, corsi..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                 {searchTerm && (
-                    <button 
-                        onClick={() => setSearchTerm('')}
-                        className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                        <X size={16} />
-                    </button>
-                 )}
+      <main className="w-full px-6 lg:px-12 flex-1 pb-16 pt-8">
+
+        {/* Search & Filter */}
+        <div className="max-w-5xl mx-auto mb-8">
+
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
+              <Search size={18} strokeWidth={2.5} />
             </div>
-
-            {/* Category Filters (Chips) */}
-            {!isLoading && resources.length > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center animate-fade-in">
-                    <button
-                        onClick={() => setSelectedCategory(null)}
-                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all border ${
-                            selectedCategory === null 
-                            ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        Tutti
-                    </button>
-                    {availableCategories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-all border whitespace-nowrap ${
-                                selectedCategory === cat
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/30'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                            }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
-                </div>
+            <input
+              type="text"
+              className="block w-full pl-10 pr-10 py-3 bg-white border-2 border-brut-border text-brut-text placeholder-brut-muted font-medium focus:outline-none focus:border-brut-accent focus:shadow-brut-accent shadow-brut"
+              placeholder="Cerca appunti, libri, corsi..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-3 flex items-center text-brut-muted hover:text-brut-text"
+              >
+                <X size={16} strokeWidth={2.5} />
+              </button>
             )}
+          </div>
+
+          {/* Category Chips */}
+          {!isLoading && resources.length > 0 && (
+            <div className="flex flex-wrap gap-2 animate-fade-in">
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 border-brut-border transition-transform hover:-translate-y-0.5 hover:shadow-brut ${
+                  selectedCategory === null
+                  ? 'bg-brut-text text-white shadow-brut'
+                  : 'bg-white text-brut-text hover:bg-brut-accent'
+                }`}
+              >
+                Tutti
+              </button>
+              {availableCategories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider border-2 border-brut-border transition-transform hover:-translate-y-0.5 hover:shadow-brut whitespace-nowrap ${
+                    selectedCategory === cat
+                    ? 'bg-brut-text text-white shadow-brut'
+                    : 'bg-white text-brut-text hover:bg-brut-accent'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
-            <Loader2 className="animate-spin text-blue-500" size={40} />
-            <p className="font-medium animate-pulse">Caricamento risorse in corso...</p>
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <Loader2 className="animate-spin text-brut-text" size={36} />
+            <p className="font-mono text-sm text-brut-muted">CARICAMENTO IN CORSO...</p>
           </div>
         ) : (
-          <div className="space-y-16">
+          <div className="space-y-12">
             {filteredResources.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200 max-w-4xl mx-auto">
+              <div className="text-center py-20 border-2 border-dashed border-brut-border max-w-4xl mx-auto bg-white">
                 {resources.length === 0 ? (
-                     <>
-                        <p className="text-xl text-slate-500 font-medium mb-2">La raccolta è vuota</p>
-                        <p className="text-slate-400 text-sm mb-6">Non ci sono ancora risorse condivise. Inizia tu!</p>
-                        <button 
-                          onClick={() => setIsModalOpen(true)}
-                          className="text-white font-bold bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-full shadow-lg shadow-blue-500/30 transition-all hover:scale-105"
-                        >
-                          Aggiungi la prima risorsa
-                        </button>
-                     </>
+                  <>
+                    <p className="text-xl font-black text-brut-text mb-2">RACCOLTA VUOTA</p>
+                    <p className="text-brut-muted text-sm mb-6 font-mono">Nessuna risorsa ancora. Inizia tu!</p>
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="font-bold bg-brut-accent text-brut-text border-2 border-brut-border px-8 py-3 shadow-brut hover:shadow-brut-lg hover:-translate-y-0.5 uppercase tracking-wider text-sm"
+                    >
+                      + Aggiungi la prima risorsa
+                    </button>
+                  </>
                 ) : (
-                     <>
-                        <p className="text-xl text-slate-500 font-medium mb-2">Nessuna risorsa trovata</p>
-                        <p className="text-slate-400 text-sm mb-6">Non ci sono risultati per i filtri selezionati.</p>
-                        <button 
-                          onClick={() => { setSearchTerm(''); setSelectedCategory(null); }}
-                          className="text-blue-600 font-bold hover:underline bg-blue-50 px-6 py-2 rounded-full"
-                        >
-                          Rimuovi tutti i filtri
-                        </button>
-                     </>
+                  <>
+                    <p className="text-xl font-black text-brut-text mb-2">NESSUN RISULTATO</p>
+                    <p className="text-brut-muted text-sm mb-6 font-mono">Nessuna risorsa corrisponde ai filtri.</p>
+                    <button
+                      onClick={() => { setSearchTerm(''); setSelectedCategory(null); }}
+                      className="font-bold border-2 border-brut-border px-6 py-2 bg-white hover:bg-brut-accent uppercase tracking-wider text-sm shadow-brut hover:-translate-y-0.5"
+                    >
+                      Rimuovi filtri
+                    </button>
+                  </>
                 )}
               </div>
             ) : (
               <>
                 {notes.length > 0 && (
-                    <ResourceTable 
-                        title={selectedCategory ? `Appunti di ${selectedCategory}` : "Appunti & Risorse Web"}
-                        items={notes} 
-                        type="note" 
-                        onEdit={handleEditClick}
-                        onDelete={handleDeleteClick}
-                    />
+                  <ResourceTable
+                    title={selectedCategory ? `Appunti — ${selectedCategory}` : "Appunti & Risorse Web"}
+                    items={notes}
+                    type="note"
+                    onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
+                  />
                 )}
                 {books.length > 0 && (
-                    <ResourceTable 
-                        title={selectedCategory ? `Libri di ${selectedCategory}` : "Libreria Digitale (PDF)"}
-                        items={books} 
-                        type="book" 
-                        onEdit={handleEditClick}
-                        onDelete={handleDeleteClick}
-                    />
+                  <ResourceTable
+                    title={selectedCategory ? `Libri — ${selectedCategory}` : "Libreria Digitale (PDF)"}
+                    items={books}
+                    type="book"
+                    onEdit={handleEditClick}
+                    onDelete={handleDeleteClick}
+                  />
                 )}
               </>
             )}
@@ -223,41 +210,41 @@ const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto py-8 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-        <div className="w-full px-6 lg:px-12 flex flex-col md:flex-row items-center justify-center gap-6 text-sm text-slate-500">
-            <div className="flex items-center gap-2">
-                <Mail size={16} className="text-slate-400" />
-                <span>
-                    Per info: <a href="mailto:giancatastrofe@gmail.com" className="text-blue-600 font-medium hover:underline transition-colors">driveunimoreinfo@gmail.com</a>
-                </span>
-            </div>
-            <div className="hidden md:block w-1 h-1 bg-slate-300 rounded-full"></div>
-            <a 
-                href="https://github.com/baleight/DriveInfo" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 hover:text-slate-800 transition-colors group"
-            >
-                <Github size={16} className="group-hover:text-black transition-colors" />
-                <span>Scarica il sorgente su GitHub</span>
+      <footer className="mt-auto py-6 border-t-2 border-brut-border bg-white">
+        <div className="w-full px-6 lg:px-12 flex flex-col md:flex-row items-center justify-center gap-4 text-xs font-mono text-brut-muted">
+          <div className="flex items-center gap-2">
+            <Mail size={14} className="text-brut-text" />
+            <a href="mailto:driveunimoreinfo@gmail.com" className="text-brut-text font-bold hover:underline">
+              driveunimoreinfo@gmail.com
             </a>
+          </div>
+          <span className="hidden md:inline text-brut-line">|</span>
+          <a
+            href="https://github.com/baleight/DriveInfo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-brut-text font-bold hover:underline"
+          >
+            <Github size={14} />
+            GitHub Sorgente
+          </a>
         </div>
       </footer>
 
-      {/* Floating Actions */}
-      <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-40">
-        <button 
+      {/* FAB — quadrato giallo */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button
           onClick={() => { setEditingItem(null); setIsModalOpen(true); }}
-          className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg shadow-blue-600/30 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+          className="w-12 h-12 bg-brut-accent text-brut-text border-2 border-brut-border shadow-brut flex items-center justify-center hover:shadow-brut-lg hover:-translate-y-0.5 active:translate-y-0 active:shadow-brut"
           title="Aggiungi nuova risorsa"
         >
-          <Plus size={28} />
+          <Plus size={24} strokeWidth={3} />
         </button>
       </div>
 
-      <AddResourceModal 
-        isOpen={isModalOpen} 
-        onClose={handleModalClose} 
+      <AddResourceModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
         onSubmit={handleCreateOrUpdate}
         initialData={editingItem}
       />

@@ -4,39 +4,46 @@
 
 @layer base {
   body {
-    font-family: 'Inter', sans-serif;
-    @apply bg-[#F5F7FA] text-slate-800 antialiased;
-    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    font-family: 'Space Grotesk', sans-serif;
+    @apply bg-brut-bg text-brut-text antialiased;
+    background-image:
+      linear-gradient(#E8E6D0 1px, transparent 1px),
+      linear-gradient(90deg, #E8E6D0 1px, transparent 1px);
     background-size: 24px 24px;
+  }
+
+  ::selection {
+    background-color: #FFE500;
+    color: #0D0D0D;
   }
 }
 
-/* Smooth transitions */
+/* Snappy transitions — no soft blurs */
 * {
   transition-property: color, background-color, border-color, transform, box-shadow;
-  transition-duration: 200ms;
+  transition-duration: 100ms;
   transition-timing-function: ease-out;
 }
 
-/* Custom Scrollbar */
+/* Brutalist Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 3px;
+  background: #0D0D0D;
+  border: 2px solid #FFFEF2;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #E8E6D0;
 }
 
-/* Animation utilities */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Slide-in animation (replaces soft fade) */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: slideIn 0.15s ease-out forwards;
 }
