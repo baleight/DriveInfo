@@ -179,6 +179,10 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   const isEditMode = !!initialData;
   const isMultiCategoryMode = sourceType === 'url';
   const selectedCategories = splitCategories(formData.category);
+  const categoryOptions = Array.from(new Set([
+    ...Object.values(ResourceCategory),
+    ...selectedCategories
+  ]));
   const isCustomCategory = !isMultiCategoryMode && !Object.values(ResourceCategory).includes(formData.category as ResourceCategory);
 
   const toggleCategory = (category: string) => {
@@ -401,7 +405,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
               {isMultiCategoryMode ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    {Object.values(ResourceCategory).map(cat => {
+                    {categoryOptions.map(cat => {
                       const isSelected = selectedCategories.includes(cat);
                       return (
                         <button
