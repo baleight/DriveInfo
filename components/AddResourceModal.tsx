@@ -167,14 +167,14 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   };
 
   const isEditMode = !!initialData;
-  const isMultiCategoryMode = sourceType === 'url';
+  const isMultiCategoryMode = isEditMode || sourceType === 'url';
+  const catalogSubjectOptions = Array.from(
+    new Set(subjectOptions.map(subject => subject.trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
   const selectedCategories = splitCategories(formData.category);
-  const categoryOptions = Array.from(new Set([
-    ...Object.values(ResourceCategory),
-    ...subjectOptions,
-    ...selectedCategories
-  ].filter(Boolean))).sort();
-  const isCustomCategory = !isMultiCategoryMode && !Object.values(ResourceCategory).includes(formData.category as ResourceCategory);
+  const legacySelectedCategories = selectedCategories.filter(cat => !catalogSubjectOptions.includes(cat));
+  const categoryOptions = catalogSubjectOptions;
+  const isCustomCategory = !isMultiCategoryMode && !categoryOptions.includes(formData.category);
 
   const toggleCategory = (category: string) => {
     const nextCategories = selectedCategories.includes(category)
@@ -286,7 +286,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                     setFormData({
                       ...formData,
                       url: '',
-                      category: splitCategories(formData.category)[0] || ResourceCategory.GENERAL
+                      category: splitCategories(formData.category)[0] || categoryOptions[0] || ResourceCategory.GENERAL
                     });
                     setError(null);
                   }}
@@ -414,6 +414,23 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                       );
                     })}
                   </div>
+
+                  {legacySelectedCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 border-t-2 border-dashed border-brut-line pt-2">
+                      {legacySelectedCategories.map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          className="inline-flex items-center gap-1.5 border-2 border-brut-line bg-brut-bg px-2 py-1 text-[10px] font-black uppercase tracking-wider text-brut-muted hover:border-red-700 hover:bg-red-50 hover:text-red-700"
+                          title="Rimuovi materia non presente nel foglio Materie"
+                        >
+                          <X size={12} strokeWidth={3} />
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <div className="relative flex-1">

@@ -80,13 +80,20 @@ const App: React.FC = () => {
       setEditingItem(null);
   };
 
+  const activeSubjectOptions = useMemo(() => {
+      return subjects
+        .filter(subject => subject.active !== false)
+        .map(subject => subject.name)
+        .filter(Boolean);
+  }, [subjects]);
+
   const availableCategories = useMemo(() => {
       const sourceCategories = hasSubjectCatalog
-        ? subjects.map(subject => subject.name).filter(Boolean)
+        ? activeSubjectOptions
         : resources.flatMap(r => splitCategories(r.category));
       const cats = new Set(sourceCategories);
       return Array.from(cats).sort();
-  }, [hasSubjectCatalog, resources, subjects]);
+  }, [activeSubjectOptions, hasSubjectCatalog, resources]);
 
   const subjectColors = useMemo(() => {
     return subjects.reduce<Record<string, TagColor>>((acc, subject) => {
@@ -281,7 +288,7 @@ const App: React.FC = () => {
         onClose={handleModalClose}
         onSubmit={handleCreateOrUpdate}
         initialData={editingItem}
-        subjectOptions={subjects.map(subject => subject.name)}
+        subjectOptions={activeSubjectOptions}
       />
 
       <SubjectManagerModal
