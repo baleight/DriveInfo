@@ -3,17 +3,17 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
-import { ResourceItem } from './types';
+import { ResourceItem, SubjectItem } from './types';
 import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
-import { Plus, Search, Loader2, X, Github, Mail } from 'lucide-react';
+import { Plus, Loader2, Github, Mail } from 'lucide-react';
 import { splitCategories } from './utils/categories';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
+  const [subjects, setSubjects] = useState<SubjectItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ResourceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,6 +21,7 @@ const App: React.FC = () => {
       try {
           const result = await getResources();
           setResources(result.resources);
+          setSubjects(result.subjects || []);
       } catch (e) {
           console.error("Error loading resources", e);
       } finally {
@@ -35,15 +36,23 @@ const App: React.FC = () => {
     onProgress?: (percentage: number) => void
   ) => {
     if (editingItem) {
+        const previousResources = resources;
         const optimisticResource = { ...formData, id: editingItem.id } as ResourceItem;
         setResources(prev => prev.map(r => r.id === editingItem.id ? optimisticResource : r));
-        const result = await updateResource(optimisticResource);
-        if (result.item) {
-             setResources(prev => prev.map(r => r.id === result.item.id ? result.item : r));
+        try {
+          const result = await updateResource(optimisticResource);
+          if (result.item) {
+               setResources(prev => prev.map(r => r.id === result.item.id ? result.item : r));
+          }
+          if (result.subjects) setSubjects(result.subjects);
+        } catch (error) {
+          setResources(previousResources);
+          throw error;
         }
     } else {
         const result = await addResource(formData, onProgress);
         setResources(prev => [result.item, ...prev]);
+        if (result.subjects) setSubjects(result.subjects);
     }
     setEditingItem(null);
   };
@@ -54,8 +63,12 @@ const App: React.FC = () => {
   };
 
   const handleDeleteClick = async (id: string) => {
+      const previousResources = resources;
       setResources(prev => prev.filter(r => r.id !== id));
-      await deleteResource(id);
+      const result = await deleteResource(id);
+      if (!result.success) {
+        setResources(previousResources);
+      }
   };
 
   const handleModalClose = () => {
@@ -64,25 +77,20 @@ const App: React.FC = () => {
   };
 
   const availableCategories = useMemo(() => {
-      const cats = new Set(resources.flatMap(r => splitCategories(r.category)));
+      const cats = new Set([
+        ...subjects.map(subject => subject.name).filter(Boolean),
+        ...resources.flatMap(r => splitCategories(r.category))
+      ]);
       return Array.from(cats).sort();
-  }, [resources]);
+  }, [resources, subjects]);
 
   const filteredResources = useMemo(() => {
     let result = resources;
     if (selectedCategory) {
         result = result.filter(r => splitCategories(r.category).includes(selectedCategory));
     }
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
-      result = result.filter(r =>
-        r.title.toLowerCase().includes(lowerTerm) ||
-        (r.category && r.category.toLowerCase().includes(lowerTerm)) ||
-        (r.description && r.description.toLowerCase().includes(lowerTerm))
-      );
-    }
     return result;
-  }, [resources, searchTerm, selectedCategory]);
+  }, [resources, selectedCategory]);
 
   const books = filteredResources.filter(r => r.type === 'book');
   const notes = filteredResources.filter(r => r.type !== 'book');
@@ -96,32 +104,8 @@ const App: React.FC = () => {
 
       <main className="w-full px-6 lg:px-12 flex-1 pb-16 pt-8">
 
-        {/* Search & Filter */}
+        {/* Subject Filter */}
         <div className="max-w-5xl mx-auto mb-8">
-
-          {/* Search Bar */}
-          <div className="relative mb-4">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
-              <Search size={18} strokeWidth={2.5} />
-            </div>
-            <input
-              type="text"
-              className="block w-full pl-10 pr-10 py-3 bg-white border-2 border-brut-border text-brut-text placeholder-brut-muted font-medium focus:outline-none focus:border-brut-accent focus:shadow-brut-accent shadow-brut"
-              placeholder="Cerca appunti, libri, corsi..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute inset-y-0 right-3 flex items-center text-brut-muted hover:text-brut-text"
-              >
-                <X size={16} strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
-
-          {/* Category Chips */}
           {!isLoading && resources.length > 0 && (
             <div className="flex flex-wrap gap-2 animate-fade-in">
               <button
@@ -176,7 +160,7 @@ const App: React.FC = () => {
                     <p className="text-xl font-black text-brut-text mb-2">NESSUN RISULTATO</p>
                     <p className="text-brut-muted text-sm mb-6 font-mono">Nessuna risorsa corrisponde ai filtri.</p>
                     <button
-                      onClick={() => { setSearchTerm(''); setSelectedCategory(null); }}
+                      onClick={() => setSelectedCategory(null)}
                       className="font-bold border-2 border-brut-border px-6 py-2 bg-white hover:bg-brut-accent uppercase tracking-wider text-sm shadow-brut hover:-translate-y-0.5"
                     >
                       Rimuovi filtri
@@ -248,6 +232,7 @@ const App: React.FC = () => {
         onClose={handleModalClose}
         onSubmit={handleCreateOrUpdate}
         initialData={editingItem}
+        subjectOptions={subjects.map(subject => subject.name)}
       />
     </div>
   );

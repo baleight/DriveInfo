@@ -6,5 +6,16 @@ export const splitCategories = (category?: string): string[] => {
 };
 
 export const joinCategories = (categories: string[]): string => {
-  return Array.from(new Set(categories.map(item => item.trim()).filter(Boolean))).join(', ');
+  const seen = new Set<string>();
+
+  return categories
+    .map(item => item.trim())
+    .filter(Boolean)
+    .filter(item => {
+      const key = item.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(', ');
 };

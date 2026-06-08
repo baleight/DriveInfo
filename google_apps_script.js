@@ -10,6 +10,31 @@
 // 7. Chi ha accesso: "Chiunque" (Anyone).
 // 8. Clicca "Pubblica" (Deploy).
 
+const RESOURCE_SHEET_NAME = 'Resources';
+const SUBJECT_SHEET_NAME = 'Materie';
+const DEFAULT_SUBJECTS = [
+  'Generale',
+  'Calcolo numerico',
+  'Linguaggi C/C++ Python',
+  'Fisica',
+  'Ingegneria del Software',
+  'Reti',
+  'Gestioni Informazioni',
+  'Ricerca operativa OLI',
+  'Architettura dei calcolatori'
+];
+const ALLOWED_COLORS = ['red', 'yellow', 'brown', 'pink', 'green', 'gray', 'default', 'purple', 'orange', 'blue'];
+const ALLOWED_TYPES = ['note', 'book'];
+const MAX_TITLE_LENGTH = 220;
+const MAX_TEXT_LENGTH = 500;
+const MAX_CATEGORY_LENGTH = 800;
+const MAX_SUBJECT_LENGTH = 90;
+const MAX_INLINE_IMAGE_CHARS = 500 * 1024;
+const MAX_PDF_DATA_CHARS = 75 * 1024 * 1024;
+const MAX_CHUNK_CHARS = 2200 * 1024;
+const MAX_TOTAL_CHUNKS = 40;
+const STORAGE_CACHE_SECONDS = 60;
+
 function _FORCE_AUTH() {
   const doc = SpreadsheetApp.getActiveSpreadsheet();
   console.log("Sheet permission: OK");
@@ -31,21 +56,226 @@ function _FORCE_AUTH() {
   console.log("Drive Write & Share permissions: OK");
 }
 
-function setupSheet() {
+function setupSheet(syncExisting, refreshValidation) {
   const doc = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = doc.getSheetByName('Resources');
+  let sheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
   if (!sheet) {
-    sheet = doc.insertSheet('Resources');
+    sheet = doc.insertSheet(RESOURCE_SHEET_NAME);
   }
   const headers = ['id', 'title', 'url', 'description', 'year', 'dateAdded', 'category', 'categoryColor', 'type', 'icon', 'coverImage'];
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
   }
+  setupSubjectsSheet(doc, false);
+  if (syncExisting !== false) syncSubjectsFromResources(doc, sheet);
+  if (refreshValidation !== false) applyCategoryValidation(doc, sheet);
+  return sheet;
 }
 
-function getStorageInfo() {
+function setupSubjectsSheet(doc, refreshValidation) {
+  let sheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  let created = false;
+  if (!sheet) {
+    sheet = doc.insertSheet(SUBJECT_SHEET_NAME);
+    created = true;
+  }
+
+  const headers = ['name', 'color', 'active', 'dateAdded'];
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    created = true;
+  }
+
+  let changed = false;
+  if (created || refreshValidation !== false) {
+    DEFAULT_SUBJECTS.forEach(function(subject) {
+      if (addSubjectIfMissing(sheet, subject, 'gray', false)) changed = true;
+    });
+  }
+
+  if (changed && refreshValidation !== false) {
+    const resourcesSheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+    if (resourcesSheet) applyCategoryValidation(doc, resourcesSheet);
+  }
+  return sheet;
+}
+
+function applyCategoryValidation(doc, resourcesSheet) {
+  const subjectsSheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  if (!resourcesSheet || !subjectsSheet) return;
+
+  const maxRows = Math.max(resourcesSheet.getMaxRows() - 1, 1);
+  const categoryRange = resourcesSheet.getRange(2, 7, maxRows, 1);
+  const subjectsRange = subjectsSheet.getRange(2, 1, Math.max(subjectsSheet.getMaxRows() - 1, 1), 1);
+  const validation = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(subjectsRange, true)
+    .setAllowInvalid(true)
+    .setHelpText('Scegli una o piu materie dal foglio Materie. Per piu materie nella stessa cella usa la virgola, es: Fisica, Reti.')
+    .build();
+
+  categoryRange.setDataValidation(validation);
+  resourcesSheet.getRange(1, 7).setNote('Collegata al foglio Materie. La cella puo contenere piu materie separate da virgola.');
+}
+
+function getSubjects(doc) {
+  const sheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  return rows
+    .map(function(row) {
+      return {
+        name: (row[0] || '').toString().trim(),
+        color: (row[1] || 'gray').toString().trim(),
+        active: row[2] === false ? false : true,
+        dateAdded: row[3] || ''
+      };
+    })
+    .filter(function(subject) { return subject.name && subject.active; });
+}
+
+function saveSubjectsFromCategory(doc, category, color) {
+  setupSubjectsSheet(doc, false);
+  const sheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  let changed = false;
+  splitCategories(category).forEach(function(subject) {
+    if (addSubjectIfMissing(sheet, subject, color || 'gray', false)) changed = true;
+  });
+  if (changed) {
+    const resourcesSheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+    if (resourcesSheet) applyCategoryValidation(doc, resourcesSheet);
+  }
+}
+
+function syncSubjectsFromResources(doc, resourcesSheet) {
+  const subjectsSheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  if (!resourcesSheet || resourcesSheet.getLastRow() < 2) return;
+
+  let changed = false;
+  const rows = resourcesSheet.getRange(2, 7, resourcesSheet.getLastRow() - 1, 2).getValues();
+  rows.forEach(function(row) {
+    const category = row[0];
+    const color = row[1] || 'gray';
+    splitCategories(category).forEach(function(subject) {
+      if (addSubjectIfMissing(subjectsSheet, subject, color, false)) changed = true;
+    });
+  });
+  if (changed) applyCategoryValidation(doc, resourcesSheet);
+}
+
+function addSubjectIfMissing(sheet, subjectName, color, refreshValidation) {
+  if (!sheet) return false;
+  subjectName = cleanText(subjectName, MAX_SUBJECT_LENGTH);
+  const normalizedName = normalizeSubject(subjectName);
+  if (!normalizedName) return false;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    const exists = values.some(function(row) {
+      return normalizeSubject(row[0]) === normalizedName;
+    });
+    if (exists) return false;
+  }
+
+  sheet.appendRow([
+    subjectName,
+    cleanColor(color),
+    true,
+    new Date().toLocaleDateString('en-GB')
+  ]);
+
+  if (refreshValidation !== false) {
+    const doc = SpreadsheetApp.getActiveSpreadsheet();
+    const resourcesSheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+    if (resourcesSheet) applyCategoryValidation(doc, resourcesSheet);
+  }
+  return true;
+}
+
+function splitCategories(category) {
+  return (category || '')
+    .toString()
+    .split(',')
+    .map(function(item) { return item.trim(); })
+    .filter(function(item) { return item; });
+}
+
+function normalizeSubject(subjectName) {
+  return (subjectName || '').toString().trim().toLowerCase();
+}
+
+function cleanText(value, maxLength) {
+  return (value || '')
+    .toString()
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .substring(0, maxLength);
+}
+
+function cleanColor(color) {
+  color = cleanText(color, 20).toLowerCase();
+  return ALLOWED_COLORS.indexOf(color) >= 0 ? color : 'gray';
+}
+
+function cleanType(type) {
+  type = cleanText(type, 20).toLowerCase();
+  return ALLOWED_TYPES.indexOf(type) >= 0 ? type : 'note';
+}
+
+function cleanUrl(url) {
+  url = cleanText(url, 2000);
+  if (!url) return '';
+  return /^https?:\/\//i.test(url) ? url : '';
+}
+
+function cleanCategory(category) {
+  const seen = {};
+  return splitCategories(category)
+    .map(function(subject) { return cleanText(subject, MAX_SUBJECT_LENGTH); })
+    .filter(function(subject) {
+      const key = normalizeSubject(subject);
+      if (!key || seen[key]) return false;
+      seen[key] = true;
+      return true;
+    })
+    .join(', ')
+    .substring(0, MAX_CATEGORY_LENGTH);
+}
+
+function cleanResourcePayload(data, fallback) {
+  fallback = fallback || {};
+  return {
+    title: cleanText(data.title !== undefined ? data.title : fallback.title, MAX_TITLE_LENGTH),
+    url: cleanUrl(data.url !== undefined ? data.url : fallback.url),
+    description: cleanText(data.description !== undefined ? data.description : fallback.description, MAX_TEXT_LENGTH),
+    year: cleanText(data.year !== undefined ? data.year : fallback.year, 80),
+    category: cleanCategory(data.category !== undefined ? data.category : fallback.category),
+    categoryColor: cleanColor(data.categoryColor !== undefined ? data.categoryColor : fallback.categoryColor),
+    type: cleanType(data.type !== undefined ? data.type : fallback.type),
+    icon: data.icon !== undefined ? data.icon : fallback.icon,
+    coverImage: data.coverImage !== undefined ? data.coverImage : fallback.coverImage
+  };
+}
+
+function isValidUploadId(uploadId) {
+  return /^[A-Za-z0-9_-]{6,80}$/.test((uploadId || '').toString());
+}
+
+function getStorageInfo(forceRefresh) {
   const LIMIT = 15 * 1024 * 1024 * 1024; // 15 GB
+  const cacheKey = 'storage_info_v1';
+  const cache = CacheService.getScriptCache();
+  if (!forceRefresh) {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      try { return JSON.parse(cached); } catch(e) {}
+    }
+  }
+
   let globalUsed = 0;
   let appFolderUsed = 0;
 
@@ -82,10 +312,9 @@ function getStorageInfo() {
   // - If global storage is working (e.g. 10GB used by Photos), that will be shown.
   const finalUsed = Math.max(globalUsed, appFolderUsed);
 
-  return { 
-    used: finalUsed, 
-    limit: LIMIT 
-  };
+  const result = { used: finalUsed, limit: LIMIT };
+  cache.put(cacheKey, JSON.stringify(result), STORAGE_CACHE_SECONDS);
+  return result;
 }
 
 function doGet(e) { return handleRequest(e); }
@@ -93,8 +322,29 @@ function doPost(e) { return handleRequest(e); }
 
 function handleRequest(e) {
   try {
+    e = e || {};
+    let data = null;
+    let action = 'create';
+    if (e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+      action = data.action || 'create';
+
+      if (action === 'upload_chunk') {
+        const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
+        try {
+            if (!isValidUploadId(data.uploadId)) throw new Error('Invalid upload id');
+            const chunkIndex = Number(data.chunkIndex);
+            if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || chunkIndex >= MAX_TOTAL_CHUNKS) throw new Error('Invalid chunk index');
+            if (!data.chunkData || data.chunkData.length > MAX_CHUNK_CHARS) throw new Error('Invalid chunk size');
+            uploadFolder.createFile(`temp_chunk_${data.uploadId}_${data.chunkIndex}`, data.chunkData, MimeType.PLAIN_TEXT);
+            return responseJSON({ status: 'success', chunk: data.chunkIndex });
+        } catch (err) { return responseJSON({ status: 'error', message: 'Chunk failed: ' + err.toString() }); }
+      }
+    }
+
     const doc = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = doc.getSheetByName('Resources');
+    setupSheet(false, false);
+    let sheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
     if (!sheet) sheet = doc.getSheets()[0];
     
     // READ (GET)
@@ -128,53 +378,67 @@ function handleRequest(e) {
       return responseJSON({
         status: 'success',
         data: data,
+        subjects: getSubjects(doc),
         storage: getStorageInfo()
       });
     }
 
     // WRITE (POST)
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action || 'create';
-    const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
-
-    // Chunk Upload
-    if (action === 'upload_chunk') {
-        try {
-            uploadFolder.createFile(`temp_chunk_${data.uploadId}_${data.chunkIndex}`, data.chunkData, MimeType.PLAIN_TEXT);
-            return responseJSON({ status: 'success', chunk: data.chunkIndex });
-        } catch (err) { return responseJSON({ status: 'error', message: 'Chunk failed: ' + err.toString() }); }
+    if (action === 'list_subjects') {
+        return responseJSON({ status: 'success', subjects: getSubjects(doc) });
     }
+
+    if (action === 'create_subject') {
+        const subjectsSheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+        addSubjectIfMissing(subjectsSheet, data.name, data.color || 'gray', true);
+        return responseJSON({ status: 'success', subjects: getSubjects(doc) });
+    }
+
+    const uploadFolder = getOrCreateFolder("Materiale_Informatica_Uploads");
 
     const lock = LockService.getScriptLock();
     if (!lock.tryLock(30000)) return responseJSON({ status: 'error', message: 'Busy' });
 
     try {
         if (action === 'create') {
+            const clean = cleanResourcePayload(data);
+            if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
+            if (!clean.category) return responseJSON({ status: 'error', message: 'Seleziona almeno una materia' });
             const id = Math.random().toString(36).substr(2, 9);
-            const finalIcon = data.icon ? processFile(data.icon, id+"_icon.png", uploadFolder) : "";
+            const finalIcon = clean.icon ? processFile(clean.icon, id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS) : "";
             
-            let finalCover = data.coverImage || "";
+            let finalCover = clean.coverImage || "";
             if (finalCover.length > 49000) {
-                 finalCover = processFile(finalCover, id+"_cover.jpg", uploadFolder);
+                 finalCover = processFile(finalCover, id+"_cover.jpg", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
             }
             
-            let resUrl = data.url || '';
-            if (data.fileData && data.fileData.length > 50) resUrl = processFile(data.fileData, id+"_file.pdf", uploadFolder);
+            let resUrl = clean.url || '';
+            if (data.fileData && data.fileData.length > 50) {
+                resUrl = processFile(data.fileData, id+"_file.pdf", uploadFolder, ['application/pdf'], MAX_PDF_DATA_CHARS);
+            }
             else if (data.uploadId) {
+                 if (!isValidUploadId(data.uploadId)) throw new Error('Invalid upload id');
+                 const totalChunks = Number(data.totalChunks);
+                 if (!Number.isInteger(totalChunks) || totalChunks <= 0 || totalChunks > MAX_TOTAL_CHUNKS) throw new Error('Invalid chunk count');
                  let full = "";
-                 for(let i=0; i<data.totalChunks; i++) {
-                     const f = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`).next();
+                 for(let i=0; i<totalChunks; i++) {
+                     const files = uploadFolder.getFilesByName(`temp_chunk_${data.uploadId}_${i}`);
+                     if (!files.hasNext()) throw new Error('Missing upload chunk ' + i);
+                     const f = files.next();
                      full += f.getBlob().getDataAsString();
                      f.setTrashed(true);
                  }
-                 resUrl = processFile(full, id+"_file.pdf", uploadFolder);
+                 resUrl = processFile(full, id+"_file.pdf", uploadFolder, ['application/pdf'], MAX_PDF_DATA_CHARS);
             }
+            if (!resUrl) return responseJSON({ status: 'error', message: 'URL o PDF obbligatorio' });
 
-            sheet.appendRow([id, data.title, resUrl, data.description, data.year, new Date().toLocaleDateString('en-GB'), data.category, data.categoryColor, (data.type||'note'), finalIcon, finalCover]);
+            sheet.appendRow([id, clean.title, resUrl, clean.description, clean.year, new Date().toLocaleDateString('en-GB'), clean.category, clean.categoryColor, clean.type, finalIcon, finalCover]);
+            saveSubjectsFromCategory(doc, clean.category, clean.categoryColor);
             return responseJSON({ 
                 status: 'success', 
-                data: { ...data, id, url: resUrl, coverImage: finalCover },
-                storage: getStorageInfo() 
+                data: { ...clean, id, url: resUrl, coverImage: finalCover },
+                subjects: getSubjects(doc),
+                storage: getStorageInfo(true) 
             });
         }
         
@@ -183,15 +447,11 @@ function handleRequest(e) {
              if (idx > 0) { 
                  const range = sheet.getRange(idx, 1, 1, 11);
                  const vals = range.getValues()[0];
-                 const url = vals[2];
-                 if (url && url.includes('drive.google.com')) {
-                    try {
-                        const idMatch = url.match(/id=([a-zA-Z0-9_-]+)/);
-                        if (idMatch) DriveApp.getFileById(idMatch[1]).setTrashed(true);
-                    } catch(e) {}
-                 }
+                 trashDriveFileFromUrl(vals[2]);
+                 trashDriveFileFromUrl(vals[9]);
+                 trashDriveFileFromUrl(vals[10]);
                  sheet.deleteRow(idx); 
-                 return responseJSON({ status: 'success', storage: getStorageInfo() }); 
+                 return responseJSON({ status: 'success', storage: getStorageInfo(true) }); 
              }
         }
 
@@ -201,29 +461,44 @@ function handleRequest(e) {
                  const range = sheet.getRange(idx, 1, 1, 11);
                  const vals = range.getValues()[0];
                  
-                 const title = (data.title !== undefined) ? data.title : vals[1];
-                 const url = data.url || vals[2];
-                 const desc = (data.description !== undefined) ? data.description : vals[3];
-                 const year = (data.year !== undefined) ? data.year : vals[4];
+                 const clean = cleanResourcePayload(data, {
+                   title: vals[1],
+                   url: vals[2],
+                   description: vals[3],
+                   year: vals[4],
+                   category: vals[6],
+                   categoryColor: vals[7],
+                   type: vals[8],
+                   icon: vals[9],
+                   coverImage: vals[10]
+                 });
+                 if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
+                 if (!clean.category) return responseJSON({ status: 'error', message: 'Seleziona almeno una materia' });
+                 const title = clean.title;
+                 const url = clean.url || vals[2];
+                 const desc = clean.description;
+                 const year = clean.year;
                  const dateAdded = vals[5];
-                 const cat = (data.category !== undefined) ? data.category : vals[6];
-                 const color = (data.categoryColor !== undefined) ? data.categoryColor : vals[7];
-                 const type = (data.type !== undefined) ? data.type : vals[8];
+                 const cat = clean.category;
+                 const color = clean.categoryColor;
+                 const type = clean.type;
 
-                 let icon = data.icon;
+                 let icon = clean.icon;
                  if (icon === undefined) icon = vals[9]; 
-                 else if (icon && icon.length > 1000 && icon.startsWith('data:')) icon = processFile(icon, data.id+"_icon.png", uploadFolder);
+                 else if (icon && icon.length > 1000 && icon.startsWith('data:')) icon = processFile(icon, data.id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
 
-                 let cov = data.coverImage;
+                 let cov = clean.coverImage;
                  if (cov === undefined) cov = vals[10];
-                 else if (cov && cov.length > 49000) cov = processFile(cov, data.id+"_cov.jpg", uploadFolder);
+                 else if (cov && cov.length > 49000) cov = processFile(cov, data.id+"_cov.jpg", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
 
                  range.setValues([[vals[0], title, url, desc, year, dateAdded, cat, color, type, icon, cov]]);
+                 saveSubjectsFromCategory(doc, cat, color);
                  
                  return responseJSON({ 
                      status: 'success', 
-                     data: { ...data, title, url, description: desc, year, category: cat, categoryColor: color, type, icon, coverImage: cov },
-                     storage: getStorageInfo()
+                     data: { ...clean, id: vals[0], title, url, description: desc, year, category: cat, categoryColor: color, type, icon, coverImage: cov },
+                     subjects: getSubjects(doc),
+                     storage: getStorageInfo(true)
                  });
              }
         }
@@ -238,14 +513,27 @@ function getOrCreateFolder(name) {
   return f.hasNext() ? f.next() : DriveApp.createFolder(name);
 }
 
-function processFile(base64, name, folder) {
+function processFile(base64, name, folder, allowedMimeTypes, maxChars) {
     if(!base64 || !base64.startsWith('data:')) return base64||'';
     try {
-        const blob = Utilities.newBlob(Utilities.base64Decode(base64.split(',')[1]), base64.split(';')[0].split(':')[1], name);
+        if (maxChars && base64.length > maxChars) throw new Error('File too large');
+        const parts = base64.split(',');
+        if (parts.length < 2) throw new Error('Invalid data URL');
+        const mimeType = parts[0].split(';')[0].split(':')[1];
+        if (allowedMimeTypes && allowedMimeTypes.indexOf(mimeType) === -1) throw new Error('Unsupported file type');
+
+        const blob = Utilities.newBlob(Utilities.base64Decode(parts[1]), mimeType, name);
         const file = folder.createFile(blob);
         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
     } catch(e) { return ''; }
+}
+function trashDriveFileFromUrl(url) {
+    if (!url || !url.toString().includes('drive.google.com')) return;
+    try {
+        const idMatch = url.toString().match(/id=([a-zA-Z0-9_-]+)/) || url.toString().match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (idMatch) DriveApp.getFileById(idMatch[1]).setTrashed(true);
+    } catch(e) {}
 }
 function findRowIndexById(sheet, id) {
     const d = sheet.getDataRange().getValues();

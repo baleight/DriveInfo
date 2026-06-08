@@ -1,6 +1,6 @@
 
 import { INITIAL_RESOURCES, GOOGLE_APPS_SCRIPT_URL } from '../constants';
-import { ResourceItem, StorageInfo, ApiResponse } from '../types';
+import { ResourceItem, StorageInfo, ApiResponse, SubjectItem } from '../types';
 
 // In-memory fallback if API is not configured
 let inMemoryDb: ResourceItem[] = [...INITIAL_RESOURCES];
@@ -14,11 +14,15 @@ const checkApiConfigured = () => {
     return true;
 };
 
+const getErrorMessage = (error: unknown): string => {
+    return error instanceof Error ? error.message : String(error);
+};
+
 // Helper: Pause execution for a given time
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper: Upload a single chunk with Retry Logic
-const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkData: string, retries = 3): Promise<any> => {
+const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkData: string, retries = 3): Promise<void> => {
     try {
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
@@ -38,10 +42,9 @@ const uploadChunkWithRetry = async (uploadId: string, chunkIndex: number, chunkD
 
         const res = await response.json();
         if (res.status !== 'success') throw new Error(res.message || 'Unknown error');
-        return res;
 
-    } catch (err: any) {
-        const errStr = (err.message || err.toString()).toLowerCase().replace(/\s+/g, ' '); // Normalize spaces
+    } catch (err: unknown) {
+        const errStr = getErrorMessage(err).toLowerCase().replace(/\s+/g, ' '); // Normalize spaces
         
         // Detect Permission Error or unrecoverable Network Error
         if (errStr.includes("autorizzazione") || errStr.includes("driveapp") || errStr.includes("permission")) {
@@ -77,6 +80,7 @@ export const getResources = async (): Promise<ApiResponse> => {
     if (json.status === 'success') {
         return {
             resources: json.data || [],
+            subjects: json.subjects || [],
             storage: json.storage || defaultStorage
         };
     } 
@@ -96,7 +100,7 @@ export const getResources = async (): Promise<ApiResponse> => {
 export const addResource = async (
     resource: Omit<ResourceItem, 'id'> & { fileData?: string }, 
     onProgress?: (percentage: number) => void
-): Promise<{ item: ResourceItem, storage?: StorageInfo }> => {
+): Promise<{ item: ResourceItem, storage?: StorageInfo, subjects?: SubjectItem[] }> => {
   const tempId = Math.random().toString(36).substr(2, 9);
   
   // Optimistic UI update
@@ -143,11 +147,14 @@ export const addResource = async (
             }),
         });
 
+        if (!finalizeResponse.ok) {
+            throw new Error(`HTTP Error ${finalizeResponse.status}`);
+        }
         const result = await finalizeResponse.json();
         if (result.status === 'success') {
             const serverItem = result.data as ResourceItem;
             inMemoryDb = inMemoryDb.map(item => item.id === tempId ? serverItem : item);
-            return { item: serverItem, storage: result.storage };
+            return { item: serverItem, storage: result.storage, subjects: result.subjects };
         } else {
              throw new Error(result.message || 'Unknown error');
         }
@@ -160,26 +167,30 @@ export const addResource = async (
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ action: 'create', ...newResourceLocal }),
         });
+        if (!response.ok) {
+            throw new Error(`HTTP Error ${response.status}`);
+        }
         if (onProgress) onProgress(100);
         const result = await response.json();
         
         if (result.status === 'success') {
-             return { item: result.data, storage: result.storage };
+             return { item: result.data, storage: result.storage, subjects: result.subjects };
         } else {
              throw new Error(result.message);
         }
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Add failed:", error);
-    const errorStr = (error.message || error.toString()).toLowerCase();
+    const errorMessage = getErrorMessage(error);
+    const errorStr = errorMessage.toLowerCase();
     
     if (errorStr.includes("autorizzazione") || errorStr.includes("driveapp")) {
         alert("Errore Permessi Google Drive. Esegui _FORCE_AUTH nello script.");
     } else if (errorStr.includes("networkerror") || errorStr.includes("failed to fetch")) {
         alert("Errore di rete durante il caricamento. La connessione potrebbe essere instabile o il file troppo grande per la velocità attuale. Riprova.");
     } else {
-        alert(`Errore caricamento: ${error.message || error}.`);
+        alert(`Errore caricamento: ${errorMessage}.`);
     }
     
     inMemoryDb = inMemoryDb.filter(i => i.id !== tempId);
@@ -187,7 +198,7 @@ export const addResource = async (
   }
 };
 
-export const updateResource = async (resource: ResourceItem): Promise<{ item: ResourceItem, storage?: StorageInfo }> => {
+export const updateResource = async (resource: ResourceItem): Promise<{ item: ResourceItem, storage?: StorageInfo, subjects?: SubjectItem[] }> => {
   inMemoryDb = inMemoryDb.map(r => r.id === resource.id ? resource : r);
   if (!checkApiConfigured()) return { item: resource };
 
@@ -197,11 +208,17 @@ export const updateResource = async (resource: ResourceItem): Promise<{ item: Re
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: 'edit', ...resource }),
     });
+    if (!response.ok) {
+      throw new Error(`HTTP Error ${response.status}`);
+    }
     const result = await response.json();
-    return result.status === 'success' ? { item: result.data, storage: result.storage } : { item: resource };
+    if (result.status !== 'success') {
+      throw new Error(result.message || 'Aggiornamento non riuscito');
+    }
+    return { item: result.data, storage: result.storage, subjects: result.subjects };
   } catch (error) {
     console.error("Update failed:", error);
-    return { item: resource };
+    throw error;
   }
 };
 

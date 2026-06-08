@@ -43,7 +43,15 @@ export interface StorageInfo {
   limit: number; // Bytes
 }
 
+export interface SubjectItem {
+  name: string;
+  color?: TagColor;
+  active?: boolean;
+  dateAdded?: string;
+}
+
 export interface ApiResponse {
   resources: ResourceItem[];
+  subjects?: SubjectItem[];
   storage?: StorageInfo;
 }

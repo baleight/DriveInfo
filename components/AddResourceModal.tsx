@@ -7,9 +7,12 @@ import { joinCategories, splitCategories } from '../utils/categories';
 interface AddResourceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<ResourceItem, 'id'>, onProgress?: (percentage: number) => void) => Promise<void>;
+  onSubmit: (data: ResourceFormData, onProgress?: (percentage: number) => void) => Promise<void>;
   initialData?: ResourceItem | null;
+  subjectOptions?: string[];
 }
+
+type ResourceFormData = Omit<ResourceItem, 'id'> & { fileData?: string };
 
 const COLOR_OPTIONS: { value: TagColor; class: string; dot: string }[] = [
   { value: TagColor.GRAY,   class: 'bg-slate-100 text-slate-700 border-slate-700',   dot: 'bg-slate-400' },
@@ -34,7 +37,7 @@ const PRESET_ICONS = [
 const inputClass = "w-full bg-white border-2 border-brut-border p-2.5 text-brut-text font-medium focus:outline-none focus:border-brut-accent focus:shadow-brut-accent";
 const labelClass = "block text-[10px] uppercase tracking-widest text-brut-muted font-bold mb-1.5";
 
-export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onClose, onSubmit, initialData, subjectOptions = [] }) => {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -160,7 +163,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     if (sourceType === 'file' && !formData.fileData && !isEditMode) { setError("Seleziona un file PDF da caricare."); return; }
     if (!formData.category.trim()) { setError("Seleziona almeno una materia."); return; }
     setLoading(true);
-    const resourceData: any = {
+    const resourceData: ResourceFormData = {
         ...formData,
         dateAdded: initialData?.dateAdded || new Date().toLocaleDateString('en-GB'),
     };
@@ -170,9 +173,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
         await onSubmit(resourceData, (progress) => setUploadProgress(progress));
         setLoading(false);
         onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
         setLoading(false);
-        setError(err.message || "Errore durante il salvataggio. Riprova.");
+        setError(err instanceof Error ? err.message : "Errore durante il salvataggio. Riprova.");
     }
   };
 
@@ -181,8 +184,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   const selectedCategories = splitCategories(formData.category);
   const categoryOptions = Array.from(new Set([
     ...Object.values(ResourceCategory),
+    ...subjectOptions,
     ...selectedCategories
-  ]));
+  ].filter(Boolean))).sort();
   const isCustomCategory = !isMultiCategoryMode && !Object.values(ResourceCategory).includes(formData.category as ResourceCategory);
 
   const toggleCategory = (category: string) => {
@@ -471,7 +475,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                         else setFormData({...formData, category: e.target.value});
                       }}
                     >
-                      {Object.values(ResourceCategory).map(cat => (
+                    {categoryOptions.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                       <option value="CUSTOM">Altro... (nuova)</option>
