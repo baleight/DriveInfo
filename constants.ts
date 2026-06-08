@@ -16,3 +16,4 @@ export const CATEGORY_COLORS: Record<TagColor, string> = {
   [TagColor.PURPLE]: 'bg-purple-100 text-purple-800',
   [TagColor.ORANGE]: 'bg-orange-100 text-orange-800',
   [TagColor.BLUE]: 'bg-blue-100 text-blue-800',
+};
