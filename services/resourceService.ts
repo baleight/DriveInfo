@@ -252,7 +252,13 @@ const postSubjectAction = async (payload: Record<string, unknown>): Promise<Subj
     throw new Error(`HTTP Error ${response.status}`);
   }
 
-  const result = await response.json();
+  const responseText = await response.text();
+  let result: { status?: string; message?: string; subjects?: SubjectItem[] };
+  try {
+    result = JSON.parse(responseText);
+  } catch {
+    throw new Error('Risposta Apps Script non valida: controlla di aver distribuito la versione aggiornata della Web App.');
+  }
   if (result.status !== 'success') {
     throw new Error(result.message || 'Operazione sulle materie non riuscita');
   }

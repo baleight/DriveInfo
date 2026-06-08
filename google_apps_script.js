@@ -530,6 +530,7 @@ function handleRequest(e) {
                  sheet.deleteRow(idx); 
                  return responseJSON({ status: 'success', storage: getStorageInfo(true) }); 
              }
+             return responseJSON({ status: 'error', message: 'Risorsa non trovata' });
         }
 
         if (action === 'edit') {
@@ -578,7 +579,10 @@ function handleRequest(e) {
                      storage: getStorageInfo(true)
                  });
              }
+             return responseJSON({ status: 'error', message: 'Risorsa non trovata' });
         }
+
+        return responseJSON({ status: 'error', message: 'Azione non riconosciuta: ' + action });
 
     } finally { lock.releaseLock(); }
 
