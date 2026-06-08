@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ResourceCategory, TagColor, ResourceItem } from '../types';
+import { ResourceCategory, ResourceItem } from '../types';
 import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
 import { joinCategories, splitCategories } from '../utils/categories';
 
@@ -13,17 +13,6 @@ interface AddResourceModalProps {
 }
 
 type ResourceFormData = Omit<ResourceItem, 'id'> & { fileData?: string };
-
-const COLOR_OPTIONS: { value: TagColor; class: string; dot: string }[] = [
-  { value: TagColor.GRAY,   class: 'bg-slate-100 text-slate-700 border-slate-700',   dot: 'bg-slate-400' },
-  { value: TagColor.RED,    class: 'bg-red-100 text-red-800 border-red-800',         dot: 'bg-red-500' },
-  { value: TagColor.BROWN,  class: 'bg-orange-100 text-orange-800 border-orange-800', dot: 'bg-orange-600' },
-  { value: TagColor.YELLOW, class: 'bg-yellow-100 text-yellow-800 border-yellow-800', dot: 'bg-yellow-400' },
-  { value: TagColor.GREEN,  class: 'bg-emerald-100 text-emerald-800 border-emerald-800', dot: 'bg-emerald-500' },
-  { value: TagColor.BLUE,   class: 'bg-blue-100 text-blue-800 border-blue-800',      dot: 'bg-blue-500' },
-  { value: TagColor.PURPLE, class: 'bg-violet-100 text-violet-800 border-violet-800', dot: 'bg-violet-500' },
-  { value: TagColor.PINK,   class: 'bg-pink-100 text-pink-800 border-pink-800',      dot: 'bg-pink-500' },
-];
 
 const PRESET_ICONS = [
   { id: 'doc',    url: 'https://www.notion.so/icons/document_blue.svg',  label: 'Documento' },
@@ -51,7 +40,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     description: '',
     year: '',
     category: ResourceCategory.GENERAL as string,
-    categoryColor: TagColor.GRAY,
     coverImage: '',
     fileData: '',
     icon: PRESET_ICONS[0].url
@@ -73,7 +61,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 description: initialData.description || '',
                 year: initialData.year || '',
                 category: initialData.category,
-                categoryColor: initialData.categoryColor || TagColor.GRAY,
                 coverImage: initialData.coverImage || '',
                 fileData: '',
                 icon: initialData.icon || PRESET_ICONS[0].url
@@ -402,9 +389,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
             </div>
           )}
 
-          {/* Category + Color */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+          {/* Category */}
+          <div>
               <label className={labelClass}>{isMultiCategoryMode ? 'Materie' : 'Materia'}</label>
               {isMultiCategoryMode ? (
                 <div className="space-y-2">
@@ -501,29 +487,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                   )}
                 </>
               )}
-            </div>
-
-            {/* Color Picker */}
-            <div>
-              <label className={labelClass}>Colore Etichetta</label>
-              <div className="flex flex-wrap gap-2">
-                {COLOR_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFormData({...formData, categoryColor: opt.value})}
-                    className={`w-8 h-8 border-2 flex items-center justify-center ${opt.dot} ${
-                      formData.categoryColor === opt.value
-                      ? 'border-brut-border shadow-brut scale-110'
-                      : 'border-brut-line hover:border-brut-border hover:scale-105 opacity-80 hover:opacity-100'
-                    }`}
-                    title={opt.value}
-                  >
-                    {formData.categoryColor === opt.value && <Check size={14} strokeWidth={3} className="text-white drop-shadow" />}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Year / Author */}

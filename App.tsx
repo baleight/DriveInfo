@@ -88,6 +88,13 @@ const App: React.FC = () => {
       return Array.from(cats).sort();
   }, [hasSubjectCatalog, resources, subjects]);
 
+  const subjectColors = useMemo(() => {
+    return subjects.reduce<Record<string, TagColor>>((acc, subject) => {
+      if (subject.name) acc[subject.name.toLowerCase()] = subject.color || TagColor.GRAY;
+      return acc;
+    }, {});
+  }, [subjects]);
+
   useEffect(() => {
     if (selectedCategory && !availableCategories.includes(selectedCategory)) {
       setSelectedCategory(null);
@@ -215,6 +222,7 @@ const App: React.FC = () => {
                     title={selectedCategory ? `Appunti — ${selectedCategory}` : "Appunti & Risorse Web"}
                     items={notes}
                     type="note"
+                    subjectColors={subjectColors}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteClick}
                   />
@@ -224,6 +232,7 @@ const App: React.FC = () => {
                     title={selectedCategory ? `Libri — ${selectedCategory}` : "Libreria Digitale (PDF)"}
                     items={books}
                     type="book"
+                    subjectColors={subjectColors}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteClick}
                   />

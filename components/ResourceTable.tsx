@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ResourceItem } from '../types';
+import { ResourceItem, TagColor } from '../types';
 import { Badge } from './Badge';
 import { FileText, BookOpen, Download, Pencil, Trash2, User, ImageOff, ExternalLink } from 'lucide-react';
 import { splitCategories } from '../utils/categories';
@@ -9,6 +9,7 @@ interface ResourceGridProps {
   title: string;
   items: ResourceItem[];
   type: 'note' | 'book';
+  subjectColors: Record<string, TagColor>;
   onEdit: (item: ResourceItem) => void;
   onDelete: (id: string) => void;
 }
@@ -35,7 +36,7 @@ const getCoverUrl = (url: string | undefined) => {
     return url;
 };
 
-export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type, onEdit, onDelete }) => {
+export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type, subjectColors, onEdit, onDelete }) => {
   if (items.length === 0) return null;
 
   return (
@@ -61,6 +62,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
             <ResourceRow
               key={item.id}
               item={item}
+              subjectColors={subjectColors}
               onEdit={() => onEdit(item)}
               onDelete={() => onDelete(item.id)}
             />
@@ -74,6 +76,7 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
               key={item.id}
               item={item}
               type={type}
+              subjectColors={subjectColors}
               onEdit={() => onEdit(item)}
               onDelete={() => onDelete(item.id)}
             />
@@ -87,16 +90,24 @@ export const ResourceTable: React.FC<ResourceGridProps> = ({ title, items, type,
 // --- ROW (Notes) ---
 interface ActionProps {
     item: ResourceItem;
+    subjectColors: Record<string, TagColor>;
     onEdit: () => void;
     onDelete: () => void;
 }
 
-const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
+const getSubjectColor = (subjectColors: Record<string, TagColor>, category: string): TagColor => {
+  return subjectColors[category.toLowerCase()] || TagColor.GRAY;
+};
+
+const ResourceRow: React.FC<ActionProps> = ({ item, subjectColors, onEdit, onDelete }) => {
+  const categories = splitCategories(item.category);
+  const firstCategoryColor = categories[0] ? getSubjectColor(subjectColors, categories[0]) : TagColor.GRAY;
+
   return (
     <div className="group relative flex items-center gap-3 px-3 py-2.5 hover:bg-brut-accent/20 min-h-[52px]">
 
       {/* Category color bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${getCategoryBarColor(item.categoryColor)}`} />
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${getCategoryBarColor(firstCategoryColor)}`} />
 
       {/* Icon — square */}
       <div className="flex-shrink-0 w-8 h-8 border border-brut-border bg-brut-bg flex items-center justify-center overflow-hidden ml-1">
@@ -113,8 +124,8 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
           {item.title}
         </span>
         <div className="flex items-center gap-2 flex-wrap">
-          {splitCategories(item.category).map(category => (
-            <Badge key={category} label={category} color={item.categoryColor} />
+          {categories.map(category => (
+            <Badge key={category} label={category} color={getSubjectColor(subjectColors, category)} />
           ))}
           {item.year && (
             <span className="font-mono text-[10px] text-brut-muted">
@@ -161,11 +172,12 @@ const ResourceRow: React.FC<ActionProps> = ({ item, onEdit, onDelete }) => {
 interface CardProps {
     item: ResourceItem;
     type: 'note' | 'book';
+    subjectColors: Record<string, TagColor>;
     onEdit: () => void;
     onDelete: () => void;
 }
 
-const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => {
+const ResourceCard: React.FC<CardProps> = ({ item, type, subjectColors, onEdit, onDelete }) => {
   const [imgError, setImgError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -207,7 +219,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
 
           <div className="mb-2 flex flex-wrap gap-1">
             {splitCategories(item.category).map(category => (
-              <Badge key={category} label={category} color={item.categoryColor} />
+              <Badge key={category} label={category} color={getSubjectColor(subjectColors, category)} />
             ))}
           </div>
 
@@ -257,7 +269,7 @@ const ResourceCard: React.FC<CardProps> = ({ item, type, onEdit, onDelete }) => 
   );
 };
 
-// Map categoryColor to a left-bar CSS class
+// Map subject color to a left-bar CSS class
 function getCategoryBarColor(color: string): string {
   const map: Record<string, string> = {
     red: 'bg-red-500',

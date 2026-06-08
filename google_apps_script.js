@@ -12,6 +12,7 @@
 
 const RESOURCE_SHEET_NAME = 'Resources';
 const SUBJECT_SHEET_NAME = 'Materie';
+const RESOURCE_HEADERS = ['id', 'title', 'url', 'description', 'year', 'dateAdded', 'category', 'type', 'icon', 'coverImage'];
 const DEFAULT_SUBJECTS = [
   'Generale',
   'Calcolo numerico',
@@ -62,15 +63,42 @@ function setupSheet(syncExisting, refreshValidation) {
   if (!sheet) {
     sheet = doc.insertSheet(RESOURCE_SHEET_NAME);
   }
-  const headers = ['id', 'title', 'url', 'description', 'year', 'dateAdded', 'category', 'categoryColor', 'type', 'icon', 'coverImage'];
   if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
     sheet.setFrozenRows(1);
   }
   setupSubjectsSheet(doc, false);
+  migrateCategoryColorColumn(doc, sheet);
   if (syncExisting !== false) syncSubjectsFromResources(doc, sheet);
   if (refreshValidation !== false) applyCategoryValidation(doc, sheet);
   return sheet;
+}
+
+function migrateCategoryColorColumn(doc, resourcesSheet) {
+  if (!resourcesSheet || resourcesSheet.getLastRow() < 1) return;
+  const lastColumn = resourcesSheet.getLastColumn();
+  const headers = resourcesSheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function(header) {
+    return (header || '').toString().toLowerCase().trim();
+  });
+  const categoryColorIndex = headers.indexOf('categorycolor');
+  if (categoryColorIndex < 0) return;
+
+  const categoryIndex = headers.indexOf('category');
+  if (categoryIndex >= 0 && resourcesSheet.getLastRow() >= 2) {
+    setupSubjectsSheet(doc, false);
+    const subjectsSheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+    const rows = resourcesSheet.getRange(2, 1, resourcesSheet.getLastRow() - 1, lastColumn).getValues();
+    rows.forEach(function(row) {
+      const category = row[categoryIndex];
+      const color = row[categoryColorIndex] || 'gray';
+      splitCategories(category).forEach(function(subject) {
+        addSubjectIfMissing(subjectsSheet, subject, color, false);
+      });
+    });
+  }
+
+  resourcesSheet.deleteColumn(categoryColorIndex + 1);
+  resourcesSheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
 }
 
 function setupSubjectsSheet(doc, refreshValidation) {
@@ -154,12 +182,11 @@ function syncSubjectsFromResources(doc, resourcesSheet) {
   if (!resourcesSheet || resourcesSheet.getLastRow() < 2) return;
 
   let changed = false;
-  const rows = resourcesSheet.getRange(2, 7, resourcesSheet.getLastRow() - 1, 2).getValues();
+  const rows = resourcesSheet.getRange(2, 7, resourcesSheet.getLastRow() - 1, 1).getValues();
   rows.forEach(function(row) {
     const category = row[0];
-    const color = row[1] || 'gray';
     splitCategories(category).forEach(function(subject) {
-      if (addSubjectIfMissing(subjectsSheet, subject, color, false)) changed = true;
+      if (addSubjectIfMissing(subjectsSheet, subject, 'gray', false)) changed = true;
     });
   });
   if (changed) applyCategoryValidation(doc, resourcesSheet);
@@ -321,7 +348,6 @@ function cleanResourcePayload(data, fallback) {
     description: cleanText(data.description !== undefined ? data.description : fallback.description, MAX_TEXT_LENGTH),
     year: cleanText(data.year !== undefined ? data.year : fallback.year, 80),
     category: cleanCategory(data.category !== undefined ? data.category : fallback.category),
-    categoryColor: cleanColor(data.categoryColor !== undefined ? data.categoryColor : fallback.categoryColor),
     type: cleanType(data.type !== undefined ? data.type : fallback.type),
     icon: data.icon !== undefined ? data.icon : fallback.icon,
     coverImage: data.coverImage !== undefined ? data.coverImage : fallback.coverImage
@@ -436,8 +462,7 @@ function handleRequest(e) {
           return {
               id: obj.id, title: obj.title, url: obj.url, description: obj.description,
               year: obj.year, dateAdded: obj.dateadded, category: obj.category,
-              categoryColor: obj.categorycolor || "gray", type: obj.type,
-              icon: obj.icon, coverImage: obj.coverimage
+              type: obj.type, icon: obj.icon, coverImage: obj.coverimage
           };
         }).filter(i => i.title);
       }
@@ -509,8 +534,8 @@ function handleRequest(e) {
             }
             if (!resUrl) return responseJSON({ status: 'error', message: 'URL o PDF obbligatorio' });
 
-            sheet.appendRow([id, clean.title, resUrl, clean.description, clean.year, new Date().toLocaleDateString('en-GB'), clean.category, clean.categoryColor, clean.type, finalIcon, finalCover]);
-            saveSubjectsFromCategory(doc, clean.category, clean.categoryColor);
+            sheet.appendRow([id, clean.title, resUrl, clean.description, clean.year, new Date().toLocaleDateString('en-GB'), clean.category, clean.type, finalIcon, finalCover]);
+            saveSubjectsFromCategory(doc, clean.category, 'gray');
             return responseJSON({ 
                 status: 'success', 
                 data: { ...clean, id, url: resUrl, coverImage: finalCover },
@@ -522,11 +547,11 @@ function handleRequest(e) {
         if (action === 'delete') {
              const idx = findRowIndexById(sheet, data.id);
              if (idx > 0) { 
-                 const range = sheet.getRange(idx, 1, 1, 11);
+                 const range = sheet.getRange(idx, 1, 1, RESOURCE_HEADERS.length);
                  const vals = range.getValues()[0];
                  trashDriveFileFromUrl(vals[2]);
+                 trashDriveFileFromUrl(vals[8]);
                  trashDriveFileFromUrl(vals[9]);
-                 trashDriveFileFromUrl(vals[10]);
                  sheet.deleteRow(idx); 
                  return responseJSON({ status: 'success', storage: getStorageInfo(true) }); 
              }
@@ -536,7 +561,7 @@ function handleRequest(e) {
         if (action === 'edit') {
              const idx = findRowIndexById(sheet, data.id);
              if (idx > 0) {
-                 const range = sheet.getRange(idx, 1, 1, 11);
+                 const range = sheet.getRange(idx, 1, 1, RESOURCE_HEADERS.length);
                  const vals = range.getValues()[0];
                  
                  const clean = cleanResourcePayload(data, {
@@ -545,10 +570,9 @@ function handleRequest(e) {
                    description: vals[3],
                    year: vals[4],
                    category: vals[6],
-                   categoryColor: vals[7],
-                   type: vals[8],
-                   icon: vals[9],
-                   coverImage: vals[10]
+                   type: vals[7],
+                   icon: vals[8],
+                   coverImage: vals[9]
                  });
                  if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
                  if (!clean.category) return responseJSON({ status: 'error', message: 'Seleziona almeno una materia' });
@@ -558,23 +582,22 @@ function handleRequest(e) {
                  const year = clean.year;
                  const dateAdded = vals[5];
                  const cat = clean.category;
-                 const color = clean.categoryColor;
                  const type = clean.type;
 
                  let icon = clean.icon;
-                 if (icon === undefined) icon = vals[9]; 
+                 if (icon === undefined) icon = vals[8]; 
                  else if (icon && icon.length > 1000 && icon.startsWith('data:')) icon = processFile(icon, data.id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
 
                  let cov = clean.coverImage;
-                 if (cov === undefined) cov = vals[10];
+                 if (cov === undefined) cov = vals[9];
                  else if (cov && cov.length > 49000) cov = processFile(cov, data.id+"_cov.jpg", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
 
-                 range.setValues([[vals[0], title, url, desc, year, dateAdded, cat, color, type, icon, cov]]);
-                 saveSubjectsFromCategory(doc, cat, color);
+                 range.setValues([[vals[0], title, url, desc, year, dateAdded, cat, type, icon, cov]]);
+                 saveSubjectsFromCategory(doc, cat, 'gray');
                  
                  return responseJSON({ 
                      status: 'success', 
-                     data: { ...clean, id: vals[0], title, url, description: desc, year, category: cat, categoryColor: color, type, icon, coverImage: cov },
+                     data: { ...clean, id: vals[0], title, url, description: desc, year, category: cat, type, icon, coverImage: cov },
                      subjects: getSubjects(doc),
                      storage: getStorageInfo(true)
                  });
