@@ -239,3 +239,39 @@ export const deleteResource = async (id: string): Promise<{ success: boolean, st
     return { success: false };
   }
 };
+
+const postSubjectAction = async (payload: Record<string, unknown>): Promise<SubjectItem[]> => {
+  if (!checkApiConfigured()) return [];
+
+  const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP Error ${response.status}`);
+  }
+
+  const result = await response.json();
+  if (result.status !== 'success') {
+    throw new Error(result.message || 'Operazione sulle materie non riuscita');
+  }
+  return result.subjects || [];
+};
+
+export const createSubject = async (name: string, color: string): Promise<SubjectItem[]> => {
+  return postSubjectAction({ action: 'create_subject', name, color });
+};
+
+export const updateSubject = async (
+  originalName: string,
+  name: string,
+  color: string,
+  active = true
+): Promise<SubjectItem[]> => {
+  return postSubjectAction({ action: 'update_subject', originalName, name, color, active });
+};
+
+export const deleteSubject = async (name: string): Promise<SubjectItem[]> => {
+  return postSubjectAction({ action: 'delete_subject', name });
+};

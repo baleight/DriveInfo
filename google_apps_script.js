@@ -195,6 +195,73 @@ function addSubjectIfMissing(sheet, subjectName, color, refreshValidation) {
   return true;
 }
 
+function updateSubject(doc, originalName, newName, color, active) {
+  const sheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  if (!sheet) throw new Error('Foglio Materie non trovato');
+
+  originalName = cleanText(originalName, MAX_SUBJECT_LENGTH);
+  newName = cleanText(newName, MAX_SUBJECT_LENGTH);
+  if (!originalName || !newName) throw new Error('Nome materia obbligatorio');
+
+  const rowIndex = findSubjectRowIndex(sheet, originalName);
+  if (rowIndex < 0) throw new Error('Materia non trovata');
+
+  const current = sheet.getRange(rowIndex, 1, 1, 4).getValues()[0];
+  const safeColor = cleanColor(color !== undefined ? color : current[1]);
+  const safeActive = active === false ? false : true;
+  sheet.getRange(rowIndex, 1, 1, 4).setValues([[newName, safeColor, safeActive, current[3] || new Date().toLocaleDateString('en-GB')]]);
+
+  if (normalizeSubject(originalName) !== normalizeSubject(newName)) {
+    updateResourceCategorySubject(doc, originalName, newName);
+  }
+
+  const resourcesSheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+  if (resourcesSheet) applyCategoryValidation(doc, resourcesSheet);
+}
+
+function deactivateSubject(doc, subjectName) {
+  const sheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
+  if (!sheet) throw new Error('Foglio Materie non trovato');
+
+  const rowIndex = findSubjectRowIndex(sheet, subjectName);
+  if (rowIndex < 0) throw new Error('Materia non trovata');
+
+  sheet.getRange(rowIndex, 3).setValue(false);
+  const resourcesSheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+  if (resourcesSheet) applyCategoryValidation(doc, resourcesSheet);
+}
+
+function findSubjectRowIndex(sheet, subjectName) {
+  const normalizedName = normalizeSubject(subjectName);
+  if (!normalizedName || sheet.getLastRow() < 2) return -1;
+
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (normalizeSubject(values[i][0]) === normalizedName) return i + 2;
+  }
+  return -1;
+}
+
+function updateResourceCategorySubject(doc, oldName, newName) {
+  const sheet = doc.getSheetByName(RESOURCE_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return;
+
+  const range = sheet.getRange(2, 7, sheet.getLastRow() - 1, 1);
+  const values = range.getValues();
+  const oldKey = normalizeSubject(oldName);
+  let changed = false;
+
+  const nextValues = values.map(function(row) {
+    const nextCategory = splitCategories(row[0]).map(function(subject) {
+      return normalizeSubject(subject) === oldKey ? newName : subject;
+    }).join(', ');
+    if (nextCategory !== row[0]) changed = true;
+    return [nextCategory];
+  });
+
+  if (changed) range.setValues(nextValues);
+}
+
 function splitCategories(category) {
   return (category || '')
     .toString()
@@ -391,6 +458,16 @@ function handleRequest(e) {
     if (action === 'create_subject') {
         const subjectsSheet = doc.getSheetByName(SUBJECT_SHEET_NAME);
         addSubjectIfMissing(subjectsSheet, data.name, data.color || 'gray', true);
+        return responseJSON({ status: 'success', subjects: getSubjects(doc) });
+    }
+
+    if (action === 'update_subject') {
+        updateSubject(doc, data.originalName, data.name, data.color, data.active);
+        return responseJSON({ status: 'success', subjects: getSubjects(doc) });
+    }
+
+    if (action === 'delete_subject') {
+        deactivateSubject(doc, data.name);
         return responseJSON({ status: 'success', subjects: getSubjects(doc) });
     }
 

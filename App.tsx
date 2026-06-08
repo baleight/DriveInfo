@@ -3,15 +3,18 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { ResourceTable } from './components/ResourceTable';
 import { AddResourceModal } from './components/AddResourceModal';
-import { ResourceItem, SubjectItem } from './types';
-import { getResources, addResource, updateResource, deleteResource } from './services/resourceService';
+import { SubjectManagerModal } from './components/SubjectManagerModal';
+import { ResourceItem, SubjectItem, TagColor } from './types';
+import { getResources, addResource, updateResource, deleteResource, createSubject, updateSubject, deleteSubject } from './services/resourceService';
 import { Plus, Loader2, Github, Mail } from 'lucide-react';
 import { splitCategories } from './utils/categories';
 
 const App: React.FC = () => {
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [subjects, setSubjects] = useState<SubjectItem[]>([]);
+  const [hasSubjectCatalog, setHasSubjectCatalog] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ResourceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -22,6 +25,7 @@ const App: React.FC = () => {
           const result = await getResources();
           setResources(result.resources);
           setSubjects(result.subjects || []);
+          setHasSubjectCatalog(result.subjects !== undefined);
       } catch (e) {
           console.error("Error loading resources", e);
       } finally {
@@ -77,12 +81,18 @@ const App: React.FC = () => {
   };
 
   const availableCategories = useMemo(() => {
-      const cats = new Set([
-        ...subjects.map(subject => subject.name).filter(Boolean),
-        ...resources.flatMap(r => splitCategories(r.category))
-      ]);
+      const sourceCategories = hasSubjectCatalog
+        ? subjects.map(subject => subject.name).filter(Boolean)
+        : resources.flatMap(r => splitCategories(r.category));
+      const cats = new Set(sourceCategories);
       return Array.from(cats).sort();
-  }, [resources, subjects]);
+  }, [hasSubjectCatalog, resources, subjects]);
+
+  useEffect(() => {
+    if (selectedCategory && !availableCategories.includes(selectedCategory)) {
+      setSelectedCategory(null);
+    }
+  }, [availableCategories, selectedCategory]);
 
   const filteredResources = useMemo(() => {
     let result = resources;
@@ -98,9 +108,39 @@ const App: React.FC = () => {
   const allNotes = resources.filter(r => r.type !== 'book');
   const allBooks = resources.filter(r => r.type === 'book');
 
+  const handleCreateSubject = async (name: string, color: TagColor) => {
+    const nextSubjects = await createSubject(name, color);
+    setSubjects(nextSubjects);
+  };
+
+  const handleUpdateSubject = async (originalName: string, name: string, color: TagColor) => {
+    const nextSubjects = await updateSubject(originalName, name, color);
+    setSubjects(nextSubjects);
+    if (selectedCategory === originalName) setSelectedCategory(name);
+    if (originalName !== name) {
+      setResources(prev => prev.map(resource => ({
+        ...resource,
+        category: splitCategories(resource.category)
+          .map(category => category === originalName ? name : category)
+          .join(', ')
+      })));
+    }
+  };
+
+  const handleDeleteSubject = async (name: string) => {
+    const nextSubjects = await deleteSubject(name);
+    setSubjects(nextSubjects);
+    if (selectedCategory === name) setSelectedCategory(null);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-brut-bg">
-      <Header noteCount={allNotes.length} bookCount={allBooks.length} />
+      <Header
+        noteCount={allNotes.length}
+        bookCount={allBooks.length}
+        subjectCount={availableCategories.length}
+        onManageSubjects={() => setIsSubjectModalOpen(true)}
+      />
 
       <main className="w-full px-6 lg:px-12 flex-1 pb-16 pt-8">
 
@@ -233,6 +273,15 @@ const App: React.FC = () => {
         onSubmit={handleCreateOrUpdate}
         initialData={editingItem}
         subjectOptions={subjects.map(subject => subject.name)}
+      />
+
+      <SubjectManagerModal
+        isOpen={isSubjectModalOpen}
+        subjects={subjects}
+        onClose={() => setIsSubjectModalOpen(false)}
+        onCreate={handleCreateSubject}
+        onUpdate={handleUpdateSubject}
+        onDelete={handleDeleteSubject}
       />
     </div>
   );
