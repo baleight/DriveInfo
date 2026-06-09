@@ -112,11 +112,7 @@ const ResourceRow: React.FC<ActionProps> = ({ item, subjectColors, onEdit, onDel
 
       {/* Icon — square */}
       <div className="flex-shrink-0 w-8 h-8 border border-brut-border bg-brut-bg flex items-center justify-center overflow-hidden ml-1">
-        {normalizeResourceIcon(item.icon) ? (
-          <img src={normalizeResourceIcon(item.icon)} alt="" className="w-5 h-5 object-contain" />
-        ) : (
-          <FileText size={14} className="text-brut-muted" />
-        )}
+        <ResourceRowIcon icon={item.icon} />
       </div>
 
       {/* Title + meta */}
@@ -166,6 +162,28 @@ const ResourceRow: React.FC<ActionProps> = ({ item, subjectColors, onEdit, onDel
         </button>
       </div>
     </div>
+  );
+};
+
+const ResourceRowIcon: React.FC<{ icon?: string }> = ({ icon }) => {
+  const [hasError, setHasError] = useState(false);
+  const displayIcon = normalizeResourceIcon(icon);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [displayIcon]);
+
+  if (!displayIcon || hasError) {
+    return <FileText size={14} className="text-brut-muted" />;
+  }
+
+  return (
+    <img
+      src={displayIcon}
+      alt=""
+      className="w-5 h-5 object-contain"
+      onError={() => setHasError(true)}
+    />
   );
 };
 

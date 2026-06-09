@@ -354,6 +354,11 @@ function cleanResourcePayload(data, fallback) {
   };
 }
 
+function shouldStoreIconInline(icon) {
+  icon = (icon || '').toString();
+  return icon.indexOf('data:image/svg+xml,') === 0 && icon.length < 10000;
+}
+
 function isValidUploadId(uploadId) {
   return /^[A-Za-z0-9_-]{6,80}$/.test((uploadId || '').toString());
 }
@@ -506,7 +511,9 @@ function handleRequest(e) {
             const clean = cleanResourcePayload(data);
             if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
             const id = Math.random().toString(36).substr(2, 9);
-            const finalIcon = clean.icon ? processFile(clean.icon, id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS) : "";
+            const finalIcon = clean.icon
+              ? (shouldStoreIconInline(clean.icon) ? clean.icon : processFile(clean.icon, id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS))
+              : "";
             
             let finalCover = clean.coverImage || "";
             if (finalCover.length > 49000) {
@@ -584,7 +591,7 @@ function handleRequest(e) {
 
                  let icon = clean.icon;
                  if (icon === undefined) icon = vals[8]; 
-                 else if (icon && icon.length > 1000 && icon.startsWith('data:')) icon = processFile(icon, data.id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
+                 else if (icon && icon.length > 1000 && icon.startsWith('data:') && !shouldStoreIconInline(icon)) icon = processFile(icon, data.id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS);
 
                  let cov = clean.coverImage;
                  if (cov === undefined) cov = vals[9];
