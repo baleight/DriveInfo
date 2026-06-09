@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ResourceCategory, ResourceItem } from '../types';
-import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, PenTool, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
+import { ResourceItem } from '../types';
+import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
 import { joinCategories, splitCategories } from '../utils/categories';
+import { normalizeResourceIcon, RESOURCE_ICONS } from '../utils/resourceIcons';
 
 interface AddResourceModalProps {
   isOpen: boolean;
@@ -15,12 +16,12 @@ interface AddResourceModalProps {
 type ResourceFormData = Omit<ResourceItem, 'id'> & { fileData?: string };
 
 const PRESET_ICONS = [
-  { id: 'doc',    url: 'https://www.notion.so/icons/document_blue.svg',  label: 'Documento' },
-  { id: 'book',   url: 'https://www.notion.so/icons/book_purple.svg',    label: 'Libro' },
-  { id: 'code',   url: 'https://www.notion.so/icons/code_red.svg',       label: 'Codice' },
-  { id: 'video',  url: 'https://www.notion.so/icons/play_pink.svg',      label: 'Video' },
-  { id: 'web',    url: 'https://www.notion.so/icons/globe_green.svg',    label: 'Web' },
-  { id: 'folder', url: 'https://www.notion.so/icons/folder_orange.svg',  label: 'Archivio' },
+  { id: 'doc',    url: RESOURCE_ICONS.document, label: 'Documento' },
+  { id: 'book',   url: RESOURCE_ICONS.book,     label: 'Libro' },
+  { id: 'code',   url: RESOURCE_ICONS.code,     label: 'Codice' },
+  { id: 'video',  url: RESOURCE_ICONS.video,    label: 'Video' },
+  { id: 'web',    url: RESOURCE_ICONS.web,      label: 'Web' },
+  { id: 'folder', url: RESOURCE_ICONS.folder,   label: 'Archivio' },
 ];
 
 const inputClass = "w-full bg-white border-2 border-brut-border p-2.5 text-brut-text font-medium focus:outline-none focus:border-brut-accent focus:shadow-brut-accent";
@@ -39,7 +40,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     url: '',
     description: '',
     year: '',
-    category: ResourceCategory.GENERAL as string,
+    category: '',
     coverImage: '',
     fileData: '',
     icon: PRESET_ICONS[0].url
@@ -47,7 +48,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
 
   const [formData, setFormData] = useState(defaultState);
   const [sourceType, setSourceType] = useState<'url' | 'file'>('url');
-  const [customCategory, setCustomCategory] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -63,14 +63,12 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 category: initialData.category,
                 coverImage: initialData.coverImage || '',
                 fileData: '',
-                icon: initialData.icon || PRESET_ICONS[0].url
+                icon: normalizeResourceIcon(initialData.icon) || PRESET_ICONS[0].url
             });
             setSourceType('url');
-            setCustomCategory('');
         } else {
             setFormData(defaultState);
             setSourceType('url');
-            setCustomCategory('');
         }
     }
   }, [isOpen, initialData]);
@@ -148,7 +146,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     setUploadProgress(0);
     if (sourceType === 'url' && !formData.url) { setError("Inserisci un URL valido."); return; }
     if (sourceType === 'file' && !formData.fileData && !isEditMode) { setError("Seleziona un file PDF da caricare."); return; }
-    if (!formData.category.trim()) { setError("Seleziona almeno una materia."); return; }
     setLoading(true);
     const resourceData: ResourceFormData = {
         ...formData,
@@ -174,7 +171,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
   const selectedCategories = splitCategories(formData.category);
   const legacySelectedCategories = selectedCategories.filter(cat => !catalogSubjectOptions.includes(cat));
   const categoryOptions = catalogSubjectOptions;
-  const isCustomCategory = !isMultiCategoryMode && !categoryOptions.includes(formData.category);
 
   const toggleCategory = (category: string) => {
     const nextCategories = selectedCategories.includes(category)
@@ -182,14 +178,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
       : [...selectedCategories, category];
 
     setFormData({ ...formData, category: joinCategories(nextCategories) });
-  };
-
-  const addCustomCategory = () => {
-    const nextCategory = customCategory.trim();
-    if (!nextCategory) return;
-
-    setFormData({ ...formData, category: joinCategories([...selectedCategories, nextCategory]) });
-    setCustomCategory('');
   };
 
   return (
@@ -247,7 +235,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                     }`}
                     title={iconItem.label}
                   >
-                    <img src={iconItem.url} alt={iconItem.label} className="w-5 h-5 object-contain" />
+                    <img src={normalizeResourceIcon(iconItem.url)} alt={iconItem.label} className="w-5 h-5 object-contain" />
                   </button>
                 ))}
               </div>
@@ -286,7 +274,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                     setFormData({
                       ...formData,
                       url: '',
-                      category: splitCategories(formData.category)[0] || categoryOptions[0] || ResourceCategory.GENERAL
+                      category: splitCategories(formData.category)[0] || ''
                     });
                     setError(null);
                   }}
@@ -432,35 +420,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        className={inputClass + ' pl-9'}
-                        placeholder="Nuova materia..."
-                        value={customCategory}
-                        onChange={(e) => setCustomCategory(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addCustomCategory();
-                          }
-                        }}
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
-                        <PenTool size={14} />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addCustomCategory}
-                      className="w-10 border-2 border-brut-border bg-white flex items-center justify-center hover:bg-brut-accent text-brut-text"
-                      title="Aggiungi materia"
-                    >
-                      <Plus size={16} strokeWidth={2.5} />
-                    </button>
-                  </div>
-
                   {selectedCategories.length > 0 && (
                     <p className="font-mono text-[10px] text-brut-muted">
                       Selezionate: {selectedCategories.join(', ')}
@@ -472,36 +431,18 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                   <div className="relative">
                     <select
                       className={inputClass + ' appearance-none pr-8'}
-                      value={isCustomCategory ? 'CUSTOM' : formData.category}
-                      onChange={(e) => {
-                        if (e.target.value === 'CUSTOM') setFormData({...formData, category: ''});
-                        else setFormData({...formData, category: e.target.value});
-                      }}
+                      value={formData.category}
+                      onChange={(e) => setFormData({...formData, category: e.target.value})}
                     >
-                    {categoryOptions.map(cat => (
+                      <option value="">Nessuna materia</option>
+                      {categoryOptions.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
-                      <option value="CUSTOM">Altro... (nuova)</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-brut-muted">
                       <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
                     </div>
                   </div>
-                  {isCustomCategory && (
-                    <div className="mt-2 animate-fade-in relative">
-                      <input
-                        autoFocus
-                        type="text"
-                        className={inputClass + ' pl-9 border-brut-accent'}
-                        placeholder="Nome nuova materia..."
-                        value={formData.category}
-                        onChange={(e) => setFormData({...formData, category: e.target.value})}
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-brut-muted">
-                        <PenTool size={14} />
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
           </div>

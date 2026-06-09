@@ -4,6 +4,7 @@ import { ResourceItem, TagColor } from '../types';
 import { Badge } from './Badge';
 import { FileText, BookOpen, Download, Pencil, Trash2, User, ImageOff, ExternalLink } from 'lucide-react';
 import { splitCategories } from '../utils/categories';
+import { normalizeResourceIcon } from '../utils/resourceIcons';
 
 interface ResourceGridProps {
   title: string;
@@ -111,8 +112,8 @@ const ResourceRow: React.FC<ActionProps> = ({ item, subjectColors, onEdit, onDel
 
       {/* Icon — square */}
       <div className="flex-shrink-0 w-8 h-8 border border-brut-border bg-brut-bg flex items-center justify-center overflow-hidden ml-1">
-        {item.icon ? (
-          <img src={item.icon} alt="" className="w-5 h-5 object-contain" />
+        {normalizeResourceIcon(item.icon) ? (
+          <img src={normalizeResourceIcon(item.icon)} alt="" className="w-5 h-5 object-contain" />
         ) : (
           <FileText size={14} className="text-brut-muted" />
         )}

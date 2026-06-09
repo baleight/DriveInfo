@@ -505,7 +505,6 @@ function handleRequest(e) {
         if (action === 'create') {
             const clean = cleanResourcePayload(data);
             if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
-            if (!clean.category) return responseJSON({ status: 'error', message: 'Seleziona almeno una materia' });
             const id = Math.random().toString(36).substr(2, 9);
             const finalIcon = clean.icon ? processFile(clean.icon, id+"_icon.png", uploadFolder, ['image/png', 'image/jpeg', 'image/webp'], MAX_INLINE_IMAGE_CHARS) : "";
             
@@ -575,7 +574,6 @@ function handleRequest(e) {
                    coverImage: vals[9]
                  });
                  if (!clean.title) return responseJSON({ status: 'error', message: 'Titolo obbligatorio' });
-                 if (!clean.category) return responseJSON({ status: 'error', message: 'Seleziona almeno una materia' });
                  const title = clean.title;
                  const url = clean.url || vals[2];
                  const desc = clean.description;

@@ -119,9 +119,6 @@ const App: React.FC = () => {
   const books = filteredResources.filter(r => r.type === 'book');
   const notes = filteredResources.filter(r => r.type !== 'book');
 
-  const allNotes = resources.filter(r => r.type !== 'book');
-  const allBooks = resources.filter(r => r.type === 'book');
-
   const handleCreateSubject = async (name: string, color: TagColor) => {
     const nextSubjects = await createSubject(name, color);
     setSubjects(nextSubjects);
@@ -149,18 +146,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-brut-bg">
-      <Header
-        noteCount={allNotes.length}
-        bookCount={allBooks.length}
-        subjectCount={availableCategories.length}
-        onManageSubjects={() => setIsSubjectModalOpen(true)}
-      />
+      <Header />
 
       <main className="w-full px-6 lg:px-12 flex-1 pb-16 pt-8">
 
         {/* Subject Filter */}
         <div className="max-w-5xl mx-auto mb-8">
-          {!isLoading && resources.length > 0 && (
+          {!isLoading && (
             <div className="flex flex-wrap gap-2 animate-fade-in">
               <button
                 onClick={() => setSelectedCategory(null)}
@@ -185,6 +177,13 @@ const App: React.FC = () => {
                   {cat}
                 </button>
               ))}
+              <button
+                onClick={() => setIsSubjectModalOpen(true)}
+                className="w-8 h-8 flex items-center justify-center text-xs font-black border-2 border-brut-border bg-brut-accent text-brut-text shadow-brut transition-transform hover:-translate-y-0.5 hover:shadow-brut-lg"
+                title="Gestisci materie"
+              >
+                <Plus size={16} strokeWidth={3} />
+              </button>
             </div>
           )}
         </div>
