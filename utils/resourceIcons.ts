@@ -12,6 +12,13 @@ export const RESOURCE_ICONS = {
 } as const;
 
 const LEGACY_ICON_MAP: Record<string, string> = {
+  doc: RESOURCE_ICONS.document,
+  document: RESOURCE_ICONS.document,
+  book: RESOURCE_ICONS.book,
+  code: RESOURCE_ICONS.code,
+  video: RESOURCE_ICONS.video,
+  web: RESOURCE_ICONS.web,
+  folder: RESOURCE_ICONS.folder,
   'https://www.notion.so/icons/document_blue.svg': RESOURCE_ICONS.document,
   'https://www.notion.so/icons/book_purple.svg': RESOURCE_ICONS.book,
   'https://www.notion.so/icons/code_red.svg': RESOURCE_ICONS.code,
@@ -20,7 +27,34 @@ const LEGACY_ICON_MAP: Record<string, string> = {
   'https://www.notion.so/icons/folder_orange.svg': RESOURCE_ICONS.folder,
 };
 
+export const RESOURCE_ICON_VALUES = {
+  document: 'document',
+  book: 'book',
+  code: 'code',
+  video: 'video',
+  web: 'web',
+  folder: 'folder',
+} as const;
+
+export const toStoredResourceIcon = (icon?: string): string => {
+  const normalizedIcon = (icon || '').trim();
+  if (normalizedIcon === 'data:image/svg+xml,') return RESOURCE_ICON_VALUES.document;
+  const matchedEntry = Object.entries(RESOURCE_ICONS).find(([, value]) => value === normalizedIcon);
+  if (matchedEntry) return RESOURCE_ICON_VALUES[matchedEntry[0] as keyof typeof RESOURCE_ICON_VALUES];
+  if (normalizedIcon === 'doc') return RESOURCE_ICON_VALUES.document;
+  if (normalizedIcon in RESOURCE_ICON_VALUES) return normalizedIcon;
+
+  const legacyEntry = Object.entries(LEGACY_ICON_MAP).find(([key]) => key === normalizedIcon);
+  if (legacyEntry) {
+    const iconEntry = Object.entries(RESOURCE_ICONS).find(([, value]) => value === legacyEntry[1]);
+    if (iconEntry) return RESOURCE_ICON_VALUES[iconEntry[0] as keyof typeof RESOURCE_ICON_VALUES];
+  }
+
+  return normalizedIcon;
+};
+
 export const normalizeResourceIcon = (icon?: string): string => {
   const normalizedIcon = (icon || '').trim();
+  if (normalizedIcon === 'data:image/svg+xml,') return RESOURCE_ICONS.document;
   return LEGACY_ICON_MAP[normalizedIcon] || normalizedIcon;
 };

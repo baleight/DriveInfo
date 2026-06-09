@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ResourceItem } from '../types';
 import { X, Loader2, FileText, BookOpen, Plus, UploadCloud, Image as ImageIcon, Trash2, Save, Link as LinkIcon, FileUp, Check, AlertCircle } from 'lucide-react';
 import { joinCategories, splitCategories } from '../utils/categories';
-import { normalizeResourceIcon, RESOURCE_ICONS } from '../utils/resourceIcons';
+import { normalizeResourceIcon, RESOURCE_ICON_VALUES, toStoredResourceIcon } from '../utils/resourceIcons';
 
 interface AddResourceModalProps {
   isOpen: boolean;
@@ -16,12 +16,12 @@ interface AddResourceModalProps {
 type ResourceFormData = Omit<ResourceItem, 'id'> & { fileData?: string };
 
 const PRESET_ICONS = [
-  { id: 'doc',    url: RESOURCE_ICONS.document, label: 'Documento' },
-  { id: 'book',   url: RESOURCE_ICONS.book,     label: 'Libro' },
-  { id: 'code',   url: RESOURCE_ICONS.code,     label: 'Codice' },
-  { id: 'video',  url: RESOURCE_ICONS.video,    label: 'Video' },
-  { id: 'web',    url: RESOURCE_ICONS.web,      label: 'Web' },
-  { id: 'folder', url: RESOURCE_ICONS.folder,   label: 'Archivio' },
+  { id: 'doc',    url: RESOURCE_ICON_VALUES.document, label: 'Documento' },
+  { id: 'book',   url: RESOURCE_ICON_VALUES.book,     label: 'Libro' },
+  { id: 'code',   url: RESOURCE_ICON_VALUES.code,     label: 'Codice' },
+  { id: 'video',  url: RESOURCE_ICON_VALUES.video,    label: 'Video' },
+  { id: 'web',    url: RESOURCE_ICON_VALUES.web,      label: 'Web' },
+  { id: 'folder', url: RESOURCE_ICON_VALUES.folder,   label: 'Archivio' },
 ];
 
 const inputClass = "w-full bg-white border-2 border-brut-border p-2.5 text-brut-text font-medium focus:outline-none focus:border-brut-accent focus:shadow-brut-accent";
@@ -43,7 +43,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
     category: '',
     coverImage: '',
     fileData: '',
-    icon: PRESET_ICONS[0].url
+    icon: RESOURCE_ICON_VALUES.document
   };
 
   const [formData, setFormData] = useState(defaultState);
@@ -63,7 +63,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({ isOpen, onCl
                 category: initialData.category,
                 coverImage: initialData.coverImage || '',
                 fileData: '',
-                icon: normalizeResourceIcon(initialData.icon) || PRESET_ICONS[0].url
+                icon: toStoredResourceIcon(initialData.icon) || PRESET_ICONS[0].url
             });
             setSourceType('url');
         } else {

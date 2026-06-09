@@ -67,11 +67,37 @@ function setupSheet(syncExisting, refreshValidation) {
     sheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
     sheet.setFrozenRows(1);
   }
+  ensureResourceIdColumn(sheet);
   setupSubjectsSheet(doc, false);
   migrateCategoryColorColumn(doc, sheet);
+  repairLegacyShiftedResourceRows(sheet);
   if (syncExisting !== false) syncSubjectsFromResources(doc, sheet);
   if (refreshValidation !== false) applyCategoryValidation(doc, sheet);
   return sheet;
+}
+
+function ensureResourceIdColumn(resourcesSheet) {
+  if (!resourcesSheet || resourcesSheet.getLastRow() < 1) return;
+  const lastColumn = resourcesSheet.getLastColumn();
+  const headers = resourcesSheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function(header) {
+    return (header || '').toString().toLowerCase().trim();
+  });
+
+  if (headers[0] === 'id') return;
+
+  if (headers.indexOf('id') < 0) {
+    resourcesSheet.insertColumnBefore(1);
+  }
+
+  resourcesSheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
+
+  if (resourcesSheet.getLastRow() >= 2) {
+    const idRange = resourcesSheet.getRange(2, 1, resourcesSheet.getLastRow() - 1, 1);
+    const ids = idRange.getValues().map(function(row, index) {
+      return [row[0] || ('row_' + (index + 2))];
+    });
+    idRange.setValues(ids);
+  }
 }
 
 function migrateCategoryColorColumn(doc, resourcesSheet) {
@@ -99,6 +125,33 @@ function migrateCategoryColorColumn(doc, resourcesSheet) {
 
   resourcesSheet.deleteColumn(categoryColorIndex + 1);
   resourcesSheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
+}
+
+function repairLegacyShiftedResourceRows(resourcesSheet) {
+  if (!resourcesSheet || resourcesSheet.getLastRow() < 2) return;
+  const lastColumn = Math.max(resourcesSheet.getLastColumn(), RESOURCE_HEADERS.length);
+  const rows = resourcesSheet.getRange(2, 1, resourcesSheet.getLastRow() - 1, lastColumn).getValues();
+  let changed = false;
+
+  const nextRows = rows.map(function(row) {
+    const typeValue = cleanText(row[7], 20).toLowerCase();
+    const nextTypeValue = cleanText(row[8], 20).toLowerCase();
+
+    if (ALLOWED_COLORS.indexOf(typeValue) >= 0 && ALLOWED_TYPES.indexOf(nextTypeValue) >= 0) {
+      row[7] = row[8];
+      row[8] = row[9] || '';
+      row[9] = row[10] || '';
+      if (row.length > RESOURCE_HEADERS.length) row[10] = '';
+      changed = true;
+    }
+
+    return row;
+  });
+
+  if (changed) {
+    resourcesSheet.getRange(2, 1, nextRows.length, lastColumn).setValues(nextRows);
+    resourcesSheet.getRange(1, 1, 1, RESOURCE_HEADERS.length).setValues([RESOURCE_HEADERS]);
+  }
 }
 
 function setupSubjectsSheet(doc, refreshValidation) {
@@ -349,14 +402,30 @@ function cleanResourcePayload(data, fallback) {
     year: cleanText(data.year !== undefined ? data.year : fallback.year, 80),
     category: cleanCategory(data.category !== undefined ? data.category : fallback.category),
     type: cleanType(data.type !== undefined ? data.type : fallback.type),
-    icon: data.icon !== undefined ? data.icon : fallback.icon,
+    icon: cleanIcon(data.icon !== undefined ? data.icon : fallback.icon),
     coverImage: data.coverImage !== undefined ? data.coverImage : fallback.coverImage
   };
 }
 
-function shouldStoreIconInline(icon) {
+function cleanIcon(icon) {
   icon = (icon || '').toString();
-  return icon.indexOf('data:image/svg+xml,') === 0 && icon.length < 10000;
+  if (!icon) return '';
+  if (icon === 'data:image/svg+xml,') return 'document';
+  if (icon === 'doc') return 'document';
+  if (['document', 'book', 'code', 'video', 'web', 'folder'].indexOf(icon) >= 0) return icon;
+  if (icon.indexOf('https://www.notion.so/icons/document_blue.svg') === 0) return 'document';
+  if (icon.indexOf('https://www.notion.so/icons/book_purple.svg') === 0) return 'book';
+  if (icon.indexOf('https://www.notion.so/icons/code_red.svg') === 0) return 'code';
+  if (icon.indexOf('https://www.notion.so/icons/play_pink.svg') === 0) return 'video';
+  if (icon.indexOf('https://www.notion.so/icons/globe_green.svg') === 0) return 'web';
+  if (icon.indexOf('https://www.notion.so/icons/folder_orange.svg') === 0) return 'folder';
+  return icon;
+}
+
+function shouldStoreIconInline(icon) {
+  icon = cleanIcon(icon);
+  return ['document', 'book', 'code', 'video', 'web', 'folder'].indexOf(icon) >= 0
+    || (icon.indexOf('data:image/svg+xml,') === 0 && icon.length < 10000);
 }
 
 function isValidUploadId(uploadId) {
